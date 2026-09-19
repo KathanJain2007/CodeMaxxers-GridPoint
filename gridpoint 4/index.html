@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GRIDPOINT — Intelligent Warehouse Location Optimization</title>
+  <meta name="description" content="Autonomous facility siting, geodesic demand weighting, and supply chain trade-off analytics for enterprise logistics." />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+  <!-- Google Fonts: DM Serif Display & Inter & Geist Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Geist+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            copper: {
+              DEFAULT: '#D4A373',
+              hover: '#E29578',
+              light: '#FAEDCD'
+            },
+            charcoal: {
+              900: '#08090C',
+              800: '#0F1218',
+              700: '#161B22',
+              600: '#1B212B'
+            }
+          },
+          fontFamily: {
+            serif: ['"DM Serif Display"', 'Georgia', 'serif'],
+            mono: ['"Geist Mono"', 'monospace'],
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet 1.9.4 CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Custom Stylesheet -->
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body class="bg-[#08090C] text-[#F4F4F6] antialiased selection:bg-[#D4A373] selection:text-[#08090C]">
+  
+  <!-- React Mount Root -->
+  <div id="root"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- React 18 & ReactDOM UMD -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+
+  <!-- GRIDPOINT Core Engine Scripts -->
+  <script src="/js/data.js"></script>
+  <script src="/js/algorithm.js"></script>
+  <script src="/js/mock_api.js"></script>
+
+  <!-- GRIDPOINT Native Compiled Application -->
+  <script src="/js/bundle.compiled.js"></script>
+</body>
+</html>
