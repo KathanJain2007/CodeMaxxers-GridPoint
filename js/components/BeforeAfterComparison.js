@@ -12,7 +12,16 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function({
   const [sliderPosition, setSliderPosition] = React.useState(50); // 0 to 100
   const [comparisonMode, setComparisonMode] = React.useState('split'); // 'split' | 'slider'
 
-  const optMetrics = optimizationResult ? optimizationResult.metrics : null;
+  const optMetrics = optimizationResult && optimizationResult.metrics
+    ? {
+        ...optimizationResult.metrics,
+        totalDeliveryCostInr: Number(optimizationResult.metrics.totalDeliveryCostInr) || 0,
+        totalDeliveryDistanceKm: Number(optimizationResult.metrics.totalDeliveryDistanceKm) || 0,
+        averageDeliveryDistanceKm: Number(optimizationResult.metrics.averageDeliveryDistanceKm) || 0,
+        totalEmissionsKgCo2: Number(optimizationResult.metrics.totalEmissionsKgCo2)
+          || Math.round((Number(optimizationResult.metrics.totalDeliveryDistanceKm) || 0) * 0.021)
+      }
+    : null;
 
   // Format currency
   const formatInr = (val) => {
@@ -45,6 +54,24 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function({
 
   const avgDistReduction = (baselineMetrics.averageDeliveryDistanceKm - optMetrics.averageDeliveryDistanceKm).toFixed(2);
   const avgDistPct = (((baselineMetrics.averageDeliveryDistanceKm - optMetrics.averageDeliveryDistanceKm) / baselineMetrics.averageDeliveryDistanceKm) * 100).toFixed(1);
+
+  const isDemoData = React.useMemo(() => {
+    if (!neighborhoods || neighborhoods.length !== 28) return false;
+    return neighborhoods.some(n => (n.neighborhood === "Koramangala" || n.name === "Koramangala"));
+  }, [neighborhoods]);
+
+  const baselineHubTitle = baselineMetrics.name || (isDemoData ? "Bangalore Majestic Hub" : "Single Central Regional Depot");
+  const baselineDescription = isDemoData
+    ? "Centralized routing via legacy depot at Bangalore Majestic Hub. Delivery fleets must traverse cross-city transit bottlenecks to reach high-demand tech corridors in Whitefield and Electronic City."
+    : `Centralized routing via single legacy facility at ${baselineHubTitle}. Delivery fleets must traverse long cross-regional transit corridors across all ${neighborhoods ? neighborhoods.length : 0} demand zones.`;
+
+  const clusterNames = (optimizationResult.warehouses || [])
+    .map(w => w.name || w.zone || w.code)
+    .slice(0, 3)
+    .join(", ");
+  const optDescription = isDemoData
+    ? "Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (East Corridor, South Tech Arc, North Central)."
+    : `Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (${clusterNames || "Regional Demand Hubs"}).`;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#08090C]/95 backdrop-blur-xl flex flex-col overflow-y-auto">
@@ -116,7 +143,7 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function({
               </div>
 
               <p className="text-xs text-[#8E96A4] leading-relaxed">
-                Centralized routing via legacy depot at Bangalore Majestic Hub. Delivery fleets must traverse cross-city transit bottlenecks to reach high-demand tech corridors in Whitefield and Electronic City.
+                {baselineDescription}
               </p>
 
               <div className="space-y-4 pt-4 border-t border-white/10">
@@ -166,7 +193,7 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function({
               </div>
 
               <p className="text-xs text-[#8E96A4] leading-relaxed">
-                Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (East Corridor, South Tech Arc, North Central).
+                {optDescription}
               </p>
 
               <div className="space-y-4 pt-4 border-t border-white/10">
@@ -225,13 +252,13 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function({
             {/* Slider Control Bar */}
             <div className="space-y-4 max-w-2xl mx-auto">
               <div className="flex justify-between text-xs font-mono font-semibold tracking-wider">
-                <span className={sliderPosition < 50 ? 'text-[#EF4444]' : 'text-white/40'}>
+                <span className={sliderPosition < 100 ? 'text-[#EF4444]' : 'text-white/40'}>
                   BEFORE (CURRENT 1-HUB)
                 </span>
                 <span className="text-[#D4A373]">
-                  {sliderPosition < 50 ? `${100 - sliderPosition * 2}% BEFORE` : `${(sliderPosition - 50) * 2}% AFTER`}
+                  {`${100 - sliderPosition}% BEFORE / ${sliderPosition}% AFTER`}
                 </span>
-                <span className={sliderPosition >= 50 ? 'text-[#10B981]' : 'text-white/40'}>
+                <span className={sliderPosition > 0 ? 'text-[#10B981]' : 'text-white/40'}>
                   AFTER (OPTIMIZED {optimizationResult.warehouses.length}-HUBS)
                 </span>
               </div>

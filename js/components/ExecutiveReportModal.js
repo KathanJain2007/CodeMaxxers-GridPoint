@@ -70,7 +70,9 @@ window.GRIDPOINT_COMPONENTS.ExecutiveReportModal = function({
               SHELVO Optimization Report
             </h1>
             <div className="text-xs text-[#8E96A4] font-mono">
-              Bengaluru Metropolitan Fulfillment Restructuring Analysis
+              {neighborhoods && neighborhoods.length === 28 && neighborhoods.some(n => n.neighborhood === "Koramangala" || n.name === "Koramangala")
+                ? "Bengaluru Metropolitan Fulfillment Restructuring Analysis"
+                : `Regional Fulfillment Restructuring Analysis (${neighborhoods ? neighborhoods.length : 0} Delivery Zones)`}
             </div>
           </div>
 

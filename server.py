@@ -212,6 +212,8 @@ def optimize_network(neighborhoods, k=3, max_capacity=None, max_radius=None, rat
         "neighborhoods": neighborhoods,
         "metrics": {
             "totalDeliveryCostInr": round(total_cost, 2),
+            "totalFixedInfraCostInr": round(len(warehouses) * FIXED_WH_DAILY_COST, 2),
+            "totalCombinedCostInr": round(total_cost + (len(warehouses) * FIXED_WH_DAILY_COST), 2),
             "totalDeliveryDistanceKm": round(total_dist_km, 1),
             "averageDeliveryDistanceKm": round(avg_dist_km, 2),
             "totalDailyOrders": int(total_orders),
@@ -394,6 +396,20 @@ Total Cost: INR {metrics.get('totalDeliveryCostInr', 145000):,.2f}/day | Avg Tra
         if m_coords:
             user_coords = (float(m_coords.group(1)), float(m_coords.group(2)))
             location_name = f"Coordinates ({user_coords[0]:.4f}, {user_coords[1]:.4f})"
+
+    custom_neighborhoods = context.get("neighborhoods") or []
+    if not user_coords and custom_neighborhoods:
+        for n in custom_neighborhoods:
+            n_name = (n.get("name") or n.get("neighborhood") or "").strip()
+            if n_name and len(n_name) > 2:
+                if re.search(r'\b' + re.escape(n_name.lower()) + r'\b', msg_clean):
+                    lat = n.get("latitude") if n.get("latitude") is not None else n.get("lat")
+                    lon = n.get("longitude") if n.get("longitude") is not None else (n.get("lon") if n.get("lon") is not None else n.get("lng"))
+                    if lat is not None and lon is not None:
+                        user_coords = (float(lat), float(lon))
+                        location_name = n_name.title()
+                        is_nearby_location = True
+                        break
 
     if not user_coords:
         for area, coords in BENGALURU_AREAS.items():
@@ -623,7 +639,31 @@ To direct your input to the right team quickly, please classify your feedback:""
     # CASE 2: NEARBY WAREHOUSE PROXIMITY & LOCATION INTELLIGENCE
     if is_nearby_location:
         if not user_coords:
-            reply = """### 📍 Locate Your Nearest Fulfillment Warehouse
+            if custom_neighborhoods and not any(n.get("name") == "Koramangala" or n.get("neighborhood") == "Koramangala" for n in custom_neighborhoods):
+                actions = [{"label": "📍 Share GPS Location", "action": "REQUEST_GEOLOCATION"}]
+                for n in custom_neighborhoods[:5]:
+                    n_label = (n.get("name") or n.get("neighborhood") or "Zone").title()
+                    actions.append({"label": f"📍 {n_label}", "action": f"CHAT_LOCATION_{n_label}"})
+                names_sample = ", ".join((n.get("name") or n.get("neighborhood") or "Zone").title() for n in custom_neighborhoods[:4])
+                reply = f"""### 📍 Locate Your Nearest Fulfillment Warehouse
+
+To identify the closest fulfillment center and estimate delivery transit times, please share your delivery location for this network.
+
+**How would you like to share your location?**
+1. **Click `📍 Share GPS Location`** below to auto-detect coordinates using device GPS.
+2. **Type your zone name** (e.g., *{names_sample}*).
+3. **Or type coordinates directly** (e.g., `lat, lon`).
+
+Select an active delivery zone or share your location below:"""
+                return {
+                    "reply": reply,
+                    "source": "ShelVO AI",
+                    "capacityCards": [],
+                    "inventoryAlerts": [],
+                    "suggestedActions": actions
+                }
+            else:
+                reply = """### 📍 Locate Your Nearest Fulfillment Warehouse
 
 To identify the closest fulfillment center and estimate EV delivery transit times, I need to know your delivery location in Bengaluru.
 
@@ -633,20 +673,20 @@ To identify the closest fulfillment center and estimate EV delivery transit time
 3. **Or type your coordinates** directly (e.g., `12.9352, 77.6245`).
 
 Select a popular area or share your location below:"""
-            return {
-                "reply": reply,
-                "source": "ShelVO AI",
-                "capacityCards": [],
-                "inventoryAlerts": [],
-                "suggestedActions": [
-                    {"label": "📍 Share GPS Location", "action": "REQUEST_GEOLOCATION"},
-                    {"label": "📍 Koramangala", "action": "CHAT_LOCATION_Koramangala"},
-                    {"label": "📍 Whitefield", "action": "CHAT_LOCATION_Whitefield"},
-                    {"label": "📍 Indiranagar", "action": "CHAT_LOCATION_Indiranagar"},
-                    {"label": "📍 Electronic City", "action": "CHAT_LOCATION_Electronic City"},
-                    {"label": "📍 HSR Layout", "action": "CHAT_LOCATION_HSR Layout"}
-                ]
-            }
+                return {
+                    "reply": reply,
+                    "source": "ShelVO AI",
+                    "capacityCards": [],
+                    "inventoryAlerts": [],
+                    "suggestedActions": [
+                        {"label": "📍 Share GPS Location", "action": "REQUEST_GEOLOCATION"},
+                        {"label": "📍 Koramangala", "action": "CHAT_LOCATION_Koramangala"},
+                        {"label": "📍 Whitefield", "action": "CHAT_LOCATION_Whitefield"},
+                        {"label": "📍 Indiranagar", "action": "CHAT_LOCATION_Indiranagar"},
+                        {"label": "📍 Electronic City", "action": "CHAT_LOCATION_Electronic City"},
+                        {"label": "📍 HSR Layout", "action": "CHAT_LOCATION_HSR Layout"}
+                    ]
+                }
 
         # User coordinates provided: compute Haversine distances to all warehouses
         u_lat, u_lon = user_coords
@@ -1309,12 +1349,23 @@ class GridpointHandler(http.server.SimpleHTTPRequestHandler):
                     self.send_json_response({"error": "Project has no dataset neighborhoods to optimize."}, status=400)
                     return
 
-                # Calculate baseline metrics (Majestic Depot 12.9774, 77.5708)
-                base_lat, base_lon = 12.9774, 77.5708
+                # Calculate baseline metrics:
+                # If neighborhoods match Bangalore demo, use Majestic Depot (12.9774, 77.5708)
+                # Otherwise, calculate baseline from dataset's own order-weighted centroid
+                tot_orders = sum(float(n.get("dailyOrders") or n.get("daily_orders") or n.get("dailyDemand") or 100) for n in neighborhoods) or 1
+                c_lat = sum(float(n.get("dailyOrders") or n.get("daily_orders") or 100) * float(n.get("latitude") if n.get("latitude") is not None else n.get("lat", 0.0)) for n in neighborhoods) / tot_orders
+                c_lon = sum(float(n.get("dailyOrders") or n.get("daily_orders") or 100) * float(n.get("longitude") if n.get("longitude") is not None else (n.get("lon") if n.get("lon") is not None else n.get("lng", 0.0))) for n in neighborhoods) / tot_orders
+                
+                dist_to_majestic = haversine_distance(c_lat, c_lon, 12.9774, 77.5708)
+                if dist_to_majestic < 60 and len(neighborhoods) == 28:
+                    base_lat, base_lon = 12.9774, 77.5708
+                else:
+                    base_lat, base_lon = c_lat, c_lon
+
                 tot_base_dist = sum(
                     (float(n.get("dailyOrders") or n.get("daily_orders") or n.get("dailyDemand") or 100)) * haversine_distance(
                         float(n.get("latitude") if n.get("latitude") is not None else n.get("lat", 0.0)),
-                        float(n.get("longitude") if n.get("longitude") is not None else n.get("lon") if n.get("lon") is not None else n.get("lng", 0.0)),
+                        float(n.get("longitude") if n.get("longitude") is not None else (n.get("lon") if n.get("lon") is not None else n.get("lng", 0.0))),
                         base_lat, base_lon
                     )
                     for n in neighborhoods

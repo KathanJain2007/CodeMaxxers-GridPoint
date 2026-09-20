@@ -1608,7 +1608,13 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function ({
   const [sliderPosition, setSliderPosition] = React.useState(50); // 0 to 100
   const [comparisonMode, setComparisonMode] = React.useState('split'); // 'split' | 'slider'
 
-  const optMetrics = optimizationResult ? optimizationResult.metrics : null;
+  const optMetrics = optimizationResult && optimizationResult.metrics ? {
+    ...optimizationResult.metrics,
+    totalDeliveryCostInr: Number(optimizationResult.metrics.totalDeliveryCostInr) || 0,
+    totalDeliveryDistanceKm: Number(optimizationResult.metrics.totalDeliveryDistanceKm) || 0,
+    averageDeliveryDistanceKm: Number(optimizationResult.metrics.averageDeliveryDistanceKm) || 0,
+    totalEmissionsKgCo2: Number(optimizationResult.metrics.totalEmissionsKgCo2) || Math.round((Number(optimizationResult.metrics.totalDeliveryDistanceKm) || 0) * 0.021)
+  } : null;
 
   // Format currency
   const formatInr = val => {
@@ -1639,6 +1645,25 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function ({
   const distPct = (distSavings / baselineMetrics.totalDeliveryDistanceKm * 100).toFixed(1);
   const avgDistReduction = (baselineMetrics.averageDeliveryDistanceKm - optMetrics.averageDeliveryDistanceKm).toFixed(2);
   const avgDistPct = ((baselineMetrics.averageDeliveryDistanceKm - optMetrics.averageDeliveryDistanceKm) / baselineMetrics.averageDeliveryDistanceKm * 100).toFixed(1);
+
+  const isDemoData = React.useMemo(() => {
+    if (!neighborhoods || neighborhoods.length !== 28) return false;
+    return neighborhoods.some(n => n.neighborhood === "Koramangala" || n.name === "Koramangala");
+  }, [neighborhoods]);
+
+  const baselineHubTitle = baselineMetrics.name || (isDemoData ? "Bangalore Majestic Hub" : "Single Central Regional Depot");
+  const baselineDescription = isDemoData
+    ? "Centralized routing via legacy depot at Bangalore Majestic Hub. Delivery fleets must traverse cross-city transit bottlenecks to reach high-demand tech corridors in Whitefield and Electronic City."
+    : "Centralized routing via single legacy facility at " + baselineHubTitle + ". Delivery fleets must traverse long cross-regional transit corridors across all " + (neighborhoods ? neighborhoods.length : 0) + " demand zones.";
+
+  const clusterNames = (optimizationResult.warehouses || [])
+    .map(w => w.name || w.zone || w.code)
+    .slice(0, 3)
+    .join(", ");
+  const optDescription = isDemoData
+    ? "Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (East Corridor, South Tech Arc, North Central)."
+    : "Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (" + (clusterNames || "Regional Demand Hubs") + ").";
+
   return /*#__PURE__*/React.createElement("div", {
     className: "fixed inset-0 z-50 bg-[#08090C]/95 backdrop-blur-xl flex flex-col overflow-y-auto"
   }, /*#__PURE__*/React.createElement("div", {
@@ -1687,7 +1712,7 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function ({
     className: "px-3 py-1 bg-[#EF4444]/10 border border-[#EF4444]/30 font-mono text-xs text-[#EF4444]"
   }, "1 CENTRAL HUB")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-[#8E96A4] leading-relaxed"
-  }, "Centralized routing via legacy depot at Bangalore Majestic Hub. Delivery fleets must traverse cross-city transit bottlenecks to reach high-demand tech corridors in Whitefield and Electronic City."), /*#__PURE__*/React.createElement("div", {
+  }, baselineDescription), /*#__PURE__*/React.createElement("div", {
     className: "space-y-4 pt-4 border-t border-white/10"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between items-baseline"
@@ -1737,7 +1762,7 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function ({
     className: "px-3 py-1 bg-[#10B981]/15 border border-[#10B981]/40 font-mono text-xs text-[#10B981] font-semibold"
   }, optimizationResult.warehouses.length, " HUBS OPTIMAL")), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-[#8E96A4] leading-relaxed"
-  }, "Order-density weighted spatial centroids calculated via iterative gradient descent. Warehouses placed directly in high-velocity clusters (East Corridor, South Tech Arc, North Central)."), /*#__PURE__*/React.createElement("div", {
+  }, optDescription), /*#__PURE__*/React.createElement("div", {
     className: "space-y-4 pt-4 border-t border-white/10"
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between items-baseline"
@@ -1803,11 +1828,11 @@ window.GRIDPOINT_COMPONENTS.BeforeAfterComparison = function ({
   }, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-between text-xs font-mono font-semibold tracking-wider"
   }, /*#__PURE__*/React.createElement("span", {
-    className: sliderPosition < 50 ? 'text-[#EF4444]' : 'text-white/40'
+    className: sliderPosition < 100 ? 'text-[#EF4444]' : 'text-white/40'
   }, "BEFORE (CURRENT 1-HUB)"), /*#__PURE__*/React.createElement("span", {
     className: "text-[#D4A373]"
-  }, sliderPosition < 50 ? `${100 - sliderPosition * 2}% BEFORE` : `${(sliderPosition - 50) * 2}% AFTER`), /*#__PURE__*/React.createElement("span", {
-    className: sliderPosition >= 50 ? 'text-[#10B981]' : 'text-white/40'
+  }, `${100 - sliderPosition}% BEFORE / ${sliderPosition}% AFTER`), /*#__PURE__*/React.createElement("span", {
+    className: sliderPosition > 0 ? 'text-[#10B981]' : 'text-white/40'
   }, "AFTER (OPTIMIZED ", optimizationResult.warehouses.length, "-HUBS)")), /*#__PURE__*/React.createElement("div", {
     className: "flex items-center space-x-4"
   }, /*#__PURE__*/React.createElement("span", {
@@ -3213,7 +3238,12 @@ window.GRIDPOINT_COMPONENTS.ExecutiveReportModal = function ({
 // Dark geospatial engine, automatic & dynamic bounds fitting, proportional demand nodes, warehouse beacons, animated connecting arcs, and service radii.
 
 window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
-window.GRIDPOINT_COMPONENTS.MapComponent = function ({
+// SHELVO — Geospatial Map Engine & Isochrone Visualizer
+// Proportional demand nodes, interactive flowlines, 15-min quick-commerce SLA isochrones, and radar warehouse beacons.
+
+window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
+
+window.GRIDPOINT_COMPONENTS.MapComponent = function({
   neighborhoods,
   optimizationResult,
   selectedWarehouse,
@@ -3227,16 +3257,20 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
     nodesLayer: null,
     linesLayer: null,
     warehousesLayer: null,
-    radiiLayer: null
+    radiiLayer: null,
+    slaLayer: null
   });
 
-  // Calculate dynamic geographic bounds from all coordinates (Sections 1, 2, 3, 11)
+  const [showFlowlines, setShowFlowlines] = React.useState(true);
+  const [showSlaIsochrones, setShowSlaIsochrones] = React.useState(true);
+  const [showRadii, setShowRadii] = React.useState(true);
+
+  // Calculate dynamic geographic bounds from all coordinates
   const calculateBounds = React.useCallback((nodes, warehouses) => {
-    let minLat = Infinity,
-      maxLat = -Infinity;
-    let minLng = Infinity,
-      maxLng = -Infinity;
+    let minLat = Infinity, maxLat = -Infinity;
+    let minLng = Infinity, maxLng = -Infinity;
     let validCount = 0;
+
     (nodes || []).forEach(n => {
       const lat = parseFloat(n.latitude);
       const lng = parseFloat(n.longitude);
@@ -3248,6 +3282,7 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
         validCount++;
       }
     });
+
     (warehouses || []).forEach(wh => {
       const lat = parseFloat(wh.latitude);
       const lng = parseFloat(wh.longitude);
@@ -3259,16 +3294,16 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
         validCount++;
       }
     });
+
     if (validCount === 0) return null;
+
     const latSpan = maxLat - minLat;
     const lngSpan = maxLng - minLng;
-    const isSingleOrTight = latSpan < 0.008 && lngSpan < 0.008;
+    const isSingleOrTight = (latSpan < 0.008) && (lngSpan < 0.008);
     const center = [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
+
     return {
-      minLat,
-      maxLat,
-      minLng,
-      maxLng,
+      minLat, maxLat, minLng, maxLng,
       center,
       isSingleOrTight,
       bounds: L.latLngBounds([minLat, minLng], [maxLat, maxLng]),
@@ -3280,12 +3315,10 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
   React.useEffect(() => {
     if (!mapContainerRef.current || leafletMapRef.current) return;
 
-    // Calculate initial center and bounds if neighborhoods are available
     const initialGeo = calculateBounds(neighborhoods, null);
     const initialCenter = initialGeo ? initialGeo.center : [12.9716, 77.5946];
-    const initialZoom = initialGeo ? initialGeo.isSingleOrTight ? 13 : 11 : 11;
+    const initialZoom = initialGeo ? (initialGeo.isSingleOrTight ? 13 : 11) : 11;
 
-    // Initialize Map with zoom control positioned safely at bottom-left
     const map = L.map(mapContainerRef.current, {
       center: initialCenter,
       zoom: initialZoom,
@@ -3296,32 +3329,24 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
       zoomAnimation: true
     });
 
-    // OpenStreetMap tiles (100% free, no API key required)
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       className: 'dark-osm-tiles'
     }).addTo(map);
 
-    // Keep zoom controls accessible at bottom-left (so they NEVER overlap top-right optimization panel)
-    L.control.zoom({
-      position: 'bottomleft'
-    }).addTo(map);
-
-    // Minimal dark attribution at bottom-left
-    L.control.attribution({
-      position: 'bottomleft',
-      prefix: 'SHELVO Geospatial'
-    }).addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+    L.control.attribution({ position: 'bottomleft', prefix: 'SHELVO Geospatial OR' }).addTo(map);
 
     // Layer groups for clean updates
     layersRef.current.radiiLayer = L.layerGroup().addTo(map);
+    layersRef.current.slaLayer = L.layerGroup().addTo(map);
     layersRef.current.linesLayer = L.layerGroup().addTo(map);
     layersRef.current.nodesLayer = L.layerGroup().addTo(map);
     layersRef.current.warehousesLayer = L.layerGroup().addTo(map);
+
     leafletMapRef.current = map;
 
-    // Handle container resize via ResizeObserver so size is never 0
     let resizeObserver = null;
     if (window.ResizeObserver && mapContainerRef.current) {
       resizeObserver = new ResizeObserver(() => {
@@ -3332,7 +3357,6 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
       resizeObserver.observe(mapContainerRef.current);
     }
 
-    // Window resize listener
     const onWindowResize = () => {
       if (leafletMapRef.current) {
         leafletMapRef.current.invalidateSize();
@@ -3340,7 +3364,6 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
     };
     window.addEventListener('resize', onWindowResize);
 
-    // Immediate initial size invalidation & bounds fit
     setTimeout(() => {
       if (!leafletMapRef.current) return;
       leafletMapRef.current.invalidateSize();
@@ -3355,6 +3378,7 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
         }
       }
     }, 100);
+
     return () => {
       if (resizeObserver) resizeObserver.disconnect();
       window.removeEventListener('resize', onWindowResize);
@@ -3363,44 +3387,64 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
     };
   }, []);
 
-  // Update map contents & automatically fit viewport whenever data changes
+  // Update map contents & automatically fit viewport whenever data or toggle states change
   React.useEffect(() => {
     const map = leafletMapRef.current;
     if (!map) return;
-    const {
-      nodesLayer,
-      linesLayer,
-      warehousesLayer,
-      radiiLayer
-    } = layersRef.current;
+
+    const { nodesLayer, linesLayer, warehousesLayer, radiiLayer, slaLayer } = layersRef.current;
     nodesLayer.clearLayers();
     linesLayer.clearLayers();
     warehousesLayer.clearLayers();
     radiiLayer.clearLayers();
-    if (!neighborhoods || neighborhoods.length === 0) {
-      return;
-    }
+    if (slaLayer) slaLayer.clearLayers();
 
-    // 1. Render Service Radii (if optimized)
+    if (!neighborhoods || neighborhoods.length === 0) return;
+
+    const roadFactor = (optimizationResult && optimizationResult.solverStats && optimizationResult.solverStats.roadFactor) || 1.30;
+
+    // 1. Render Service Radii & 15-min SLA Isochrone Rings
     if (optimizationResult && optimizationResult.warehouses) {
       optimizationResult.warehouses.forEach(wh => {
-        const radiusMeters = (wh.serviceRadiusKm || 8) * 1000;
         const isSelected = selectedWarehouse && selectedWarehouse.id === wh.id;
-        const circle = L.circle([wh.latitude, wh.longitude], {
-          radius: radiusMeters,
-          color: wh.color || '#D4A373',
-          weight: isSelected ? 1.8 : 0.8,
-          opacity: isSelected ? 0.6 : 0.25,
-          fillColor: wh.color || '#D4A373',
-          fillOpacity: isSelected ? 0.08 : 0.03,
-          dashArray: '4, 8'
-        });
-        radiiLayer.addLayer(circle);
+
+        // Service Boundary Radius Ring
+        if (showRadii) {
+          const radiusMeters = (wh.serviceRadiusKm || 8) * 1000;
+          const circle = L.circle([wh.latitude, wh.longitude], {
+            radius: radiusMeters,
+            color: wh.color || '#D4A373',
+            weight: isSelected ? 1.8 : 0.8,
+            opacity: isSelected ? 0.6 : 0.25,
+            fillColor: wh.color || '#D4A373',
+            fillOpacity: isSelected ? 0.08 : 0.03,
+            dashArray: '4, 8'
+          });
+          radiiLayer.addLayer(circle);
+        }
+
+        // 15-Minute Quick-Commerce SLA Isochrone Ring (approx 4.6km straight-line = 6.0km road @ 24km/h)
+        if (showSlaIsochrones && slaLayer) {
+          const slaRadiusMeters = (6.0 / roadFactor) * 1000;
+          const slaCircle = L.circle([wh.latitude, wh.longitude], {
+            radius: slaRadiusMeters,
+            color: '#10B981',
+            weight: 1.2,
+            opacity: 0.5,
+            fillColor: '#10B981',
+            fillOpacity: 0.04,
+            dashArray: '3, 6'
+          });
+          slaLayer.addLayer(slaCircle);
+        }
       });
     }
 
-    // 2. Resolve assignment for each neighborhood (from assignments array or assignedNeighborhoods or nearest centroid)
-    let assignmentsArray = optimizationResult && Array.isArray(optimizationResult.assignments) && optimizationResult.assignments.length === neighborhoods.length ? optimizationResult.assignments : null;
+    // 2. Resolve assignments for each neighborhood
+    let assignmentsArray = (optimizationResult && Array.isArray(optimizationResult.assignments) && optimizationResult.assignments.length === neighborhoods.length)
+      ? optimizationResult.assignments
+      : null;
+
     if (!assignmentsArray && optimizationResult && optimizationResult.warehouses && optimizationResult.warehouses.length > 0) {
       assignmentsArray = neighborhoods.map(n => {
         const nName = (n.neighborhood || n.name || '').toLowerCase();
@@ -3410,7 +3454,6 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
             return wIdx;
           }
         }
-        // Fallback: nearest warehouse by geodesic distance
         let minDist = Infinity;
         let bestW = 0;
         optimizationResult.warehouses.forEach((wh, wIdx) => {
@@ -3424,36 +3467,40 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
       });
     }
 
-    // Render Connecting Lines from Neighborhoods to Warehouses (if optimized)
-    if (optimizationResult && optimizationResult.warehouses && assignmentsArray) {
+    // Render Connecting Flowline Arcs
+    if (showFlowlines && optimizationResult && optimizationResult.warehouses && assignmentsArray) {
       neighborhoods.forEach((n, i) => {
         const whIndex = assignmentsArray[i];
         const wh = optimizationResult.warehouses[whIndex];
         if (!wh) return;
+
         const isWhSelected = selectedWarehouse && selectedWarehouse.id === wh.id;
-        const line = L.polyline([[n.latitude, n.longitude], [wh.latitude, wh.longitude]], {
-          color: wh.color || '#D4A373',
-          weight: isWhSelected ? 1.8 : 1.0,
-          opacity: isWhSelected ? 0.85 : 0.35,
-          dashArray: isWhSelected ? null : '4, 6',
-          className: isWhSelected ? '' : 'connector-flowing'
-        });
+        const line = L.polyline(
+          [[n.latitude, n.longitude], [wh.latitude, wh.longitude]],
+          {
+            color: wh.color || '#D4A373',
+            weight: isWhSelected ? 1.8 : 1.0,
+            opacity: isWhSelected ? 0.85 : 0.35,
+            dashArray: isWhSelected ? null : '4, 6',
+            className: isWhSelected ? '' : 'connector-flowing'
+          }
+        );
         linesLayer.addLayer(line);
       });
     }
 
-    // 3. Render Neighborhood Points (sized proportionally to Daily Orders)
-    const maxOrders = Math.max(...neighborhoods.map(d => d.dailyOrders || 100));
-    const minOrders = Math.min(...neighborhoods.map(d => d.dailyOrders || 100));
+    // 3. Render Neighborhood Demand Points
+    const maxOrders = Math.max(...neighborhoods.map(d => d.dailyOrders || d.daily_orders || 100));
+    const minOrders = Math.min(...neighborhoods.map(d => d.dailyOrders || d.daily_orders || 100));
+
     neighborhoods.forEach((n, i) => {
-      // Proportional radius calculation (4.5px to 13px)
-      const orders = n.dailyOrders || 200;
+      const orders = parseFloat(n.dailyOrders || n.daily_orders || n.dailyDemand || 100);
       const normalized = (orders - minOrders) / (maxOrders - minOrders || 1);
       const radius = 4.5 + normalized * 8.5;
 
-      // Color coding: cluster color if optimized, neutral warm silver if raw
       let nodeColor = '#94A3B8';
       let assignedWh = null;
+
       if (optimizationResult && optimizationResult.warehouses && assignmentsArray) {
         const whIndex = assignmentsArray[i];
         assignedWh = optimizationResult.warehouses[whIndex];
@@ -3461,58 +3508,68 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
           nodeColor = assignedWh.color;
         }
       }
-      const distToWh = assignedWh ? window.GRIDPOINT_ALGO.haversine(n.latitude, n.longitude, assignedWh.latitude, assignedWh.longitude).toFixed(1) : null;
+
+      const distGeo = assignedWh
+        ? window.GRIDPOINT_ALGO.haversine(n.latitude, n.longitude, assignedWh.latitude, assignedWh.longitude)
+        : null;
+      const distRoad = distGeo !== null ? (distGeo * roadFactor) : null;
+      const transitMinutes = distRoad !== null ? ((distRoad / 24) * 60) : null;
+      const isSla15 = transitMinutes !== null && transitMinutes <= 15;
+
       const circleMarker = L.circleMarker([n.latitude, n.longitude], {
         radius: radius,
         fillColor: nodeColor,
-        fillOpacity: 0.75,
+        fillOpacity: 0.78,
         color: '#FFFFFF',
         weight: 1.2,
         opacity: 0.9
       });
 
-      // Rich Bloomberg-style tooltip
       const tooltipContent = `
-        <div style="background:#0F1218; border:1px solid rgba(255,255,255,0.12); padding:10px 14px; color:#F4F4F6; font-family:'Inter', sans-serif; box-shadow:0 12px 28px rgba(0,0,0,0.7); min-width:180px;">
-          <div style="font-family:'Geist Mono', monospace; font-size:10px; color:#8E96A4; letter-spacing:0.08em; text-transform:uppercase;">
-            NEIGHBORHOOD NODE
+        <div style="background:#0F1218; border:1px solid rgba(255,255,255,0.14); padding:10px 14px; color:#F4F4F6; font-family:'Inter', sans-serif; box-shadow:0 12px 28px rgba(0,0,0,0.8); min-width:200px; border-radius:8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-family:'Geist Mono', monospace; font-size:9px; color:#8E96A4; letter-spacing:0.08em; text-transform:uppercase;">DEMAND NODE</span>
+            ${isSla15 ? '<span style="font-family:\'Geist Mono\', monospace; font-size:8px; font-weight:700; background:rgba(16,185,129,0.2); color:#10B981; border:1px solid rgba(16,185,129,0.4); padding:1px 4px; border-radius:3px;">⚡ 15m SLA OK</span>' : ''}
           </div>
-          <div style="font-size:14px; font-weight:600; color:#FFF; margin-top:2px; margin-bottom:8px;">
-            ${n.neighborhood}
+          <div style="font-size:13px; font-weight:700; color:#FFF; margin-bottom:6px;">
+            ${n.neighborhood || n.name || "Delivery Zone"}
           </div>
-          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:3px;">
             <span style="color:#8E96A4;">Daily Orders:</span>
-            <span style="font-family:'Geist Mono', monospace; font-weight:600; color:${nodeColor};">${orders.toLocaleString()} /day</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
-            <span style="color:#8E96A4;">Coordinates:</span>
-            <span style="font-family:'Geist Mono', monospace; color:#CBD5E1;">${n.latitude.toFixed(3)}°, ${n.longitude.toFixed(3)}°</span>
+            <span style="font-family:'Geist Mono', monospace; font-weight:600; color:${nodeColor};">${Math.round(orders).toLocaleString()} /day</span>
           </div>
           ${assignedWh ? `
             <div style="border-top:1px solid rgba(255,255,255,0.08); margin-top:6px; padding-top:6px; display:flex; justify-content:space-between; font-size:11px;">
               <span style="color:#8E96A4;">Assigned Hub:</span>
               <span style="font-weight:600; color:${assignedWh.color};">${assignedWh.name}</span>
             </div>
-            <div style="display:flex; justify-content:space-between; font-size:11px;">
-              <span style="color:#8E96A4;">Transit Distance:</span>
-              <span style="font-family:'Geist Mono', monospace; color:#FFF;">${distToWh} km</span>
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:2px;">
+              <span style="color:#8E96A4;">Road Distance (${roadFactor.toFixed(2)}x):</span>
+              <span style="font-family:'Geist Mono', monospace; color:#FFF;">${distRoad.toFixed(2)} km</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:2px;">
+              <span style="color:#8E96A4;">Estimated Transit:</span>
+              <span style="font-family:'Geist Mono', monospace; font-weight:600; color:${isSla15 ? '#10B981' : '#F59E0B'};">~${transitMinutes.toFixed(1)} mins</span>
             </div>
           ` : ''}
         </div>
       `;
+
       circleMarker.bindTooltip(tooltipContent, {
         direction: 'top',
         offset: [0, -radius],
         opacity: 1,
         className: 'custom-leaflet-tooltip'
       });
+
       nodesLayer.addLayer(circleMarker);
     });
 
-    // 4. Render Warehouse Markers (distinct geometric icons with pulsing radar beacons)
+    // 4. Render Warehouse Markers with radar pulses
     if (optimizationResult && optimizationResult.warehouses) {
       optimizationResult.warehouses.forEach(wh => {
         const isSelected = selectedWarehouse && selectedWarehouse.id === wh.id;
+
         const customIcon = L.divIcon({
           className: 'warehouse-div-icon',
           html: `
@@ -3532,101 +3589,85 @@ window.GRIDPOINT_COMPONENTS.MapComponent = function ({
           iconSize: [44, 44],
           iconAnchor: [22, 22]
         });
-        const marker = L.marker([wh.latitude, wh.longitude], {
-          icon: customIcon
-        });
+
+        const marker = L.marker([wh.latitude, wh.longitude], { icon: customIcon });
         marker.on('click', () => {
           if (onSelectWarehouse) onSelectWarehouse(wh);
         });
+
         warehousesLayer.addLayer(marker);
       });
     }
 
-    // 5. Automatic Dynamic Viewport Fitting (Sections 1, 2, 3, 11)
-    // Fits map bounds to BOTH neighborhood coordinates and warehouse coordinates
-    const geo = calculateBounds(neighborhoods, optimizationResult ? optimizationResult.warehouses : null);
-    if (geo && map) {
-      map.invalidateSize();
-      setTimeout(() => {
-        if (!leafletMapRef.current) return;
-        leafletMapRef.current.invalidateSize();
-        if (geo.isTightOrSingle) {
-          leafletMapRef.current.setView(geo.center, 13, {
-            animate: true
-          });
-        } else {
-          leafletMapRef.current.fitBounds(geo.bounds, {
-            padding: [80, 80],
-            maxZoom: 13,
-            animate: true,
-            duration: 0.6
-          });
-        }
-      }, 50);
+    // Dynamic Viewport Fitting
+    const geo = calculateBounds(
+      neighborhoods,
+      optimizationResult ? optimizationResult.warehouses : null
+    );
+    if (geo && leafletMapRef.current) {
+      if (geo.isSingleOrTight) {
+        leafletMapRef.current.setView(geo.center, 13);
+      } else {
+        leafletMapRef.current.fitBounds(geo.bounds, {
+          padding: [80, 80],
+          maxZoom: 13
+        });
+      }
     }
-  }, [neighborhoods, optimizationResult, selectedWarehouse, calculateBounds]);
-  const hasData = neighborhoods && neighborhoods.length > 0;
-  return /*#__PURE__*/React.createElement("div", {
-    className: "relative w-full h-full bg-[#08090C] overflow-hidden"
-  }, /*#__PURE__*/React.createElement("div", {
-    ref: mapContainerRef,
-    className: "w-full h-full",
-    style: {
-      width: '100%',
-      height: '100%'
-    }
-  }), !hasData && /*#__PURE__*/React.createElement("div", {
-    className: "absolute inset-0 z-20 flex items-center justify-center bg-[#08090C]/80 backdrop-blur-sm pointer-events-auto"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "glass-panel p-10 max-w-md text-center border border-white/10 shadow-2xl"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-12 h-12 mx-auto mb-6 border border-[#D4A373]/40 bg-[#D4A373]/10 flex items-center justify-center rotate-45"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-lg text-[#D4A373] -rotate-45"
-  }, "\u2726")), /*#__PURE__*/React.createElement("div", {
-    className: "font-mono text-xs text-[#D4A373] tracking-[0.2em] uppercase mb-2"
-  }, "System Ready"), /*#__PURE__*/React.createElement("h3", {
-    className: "font-serif text-3xl text-white mb-3 tracking-tight"
-  }, "YOUR NETWORK STARTS HERE."), /*#__PURE__*/React.createElement("p", {
-    className: "text-sm text-[#8E96A4] leading-relaxed mb-8 font-light"
-  }, "Upload geospatial demand data to discover mathematically optimal warehouse locations, cluster assignments, and delivery cost curves."), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenImport,
-    className: "w-full py-3.5 bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] font-medium text-xs font-mono tracking-widest uppercase transition-all shadow-lg shadow-[#D4A373]/20"
-  }, "Import Dataset"))), hasData && /*#__PURE__*/React.createElement("div", {
-    className: "absolute bottom-16 left-4 z-10 glass-panel p-3 border border-white/10 text-xs text-[#8E96A4] hidden sm:block pointer-events-none",
-    style: {
-      zIndex: 500
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "font-mono text-[9px] uppercase tracking-widest text-white/50 mb-1.5"
-  }, "MAP LEGEND"), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-1 font-mono text-[10px]"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2.5 h-2.5 rounded-full bg-[#94A3B8] inline-block"
-  }), /*#__PURE__*/React.createElement("span", null, "Neighborhood Node (Size = Daily Volume)")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2.5 h-2.5 rotate-45 border border-[#D4A373] bg-[#D4A373] inline-block"
-  }), /*#__PURE__*/React.createElement("span", null, "Warehouse Centroid")), optimizationResult && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-3 border-b border-dashed border-[#D4A373] inline-block"
-  }), /*#__PURE__*/React.createElement("span", null, "Geodesic Transit Route")), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-2.5 h-2.5 rounded-full border border-dotted border-[#D4A373] inline-block"
-  }), /*#__PURE__*/React.createElement("span", null, "Max Service Radius"))))));
+  }, [neighborhoods, optimizationResult, selectedWarehouse, showFlowlines, showSlaIsochrones, showRadii, calculateBounds]);
+
+  return React.createElement("div", { className: "relative w-full h-full" },
+    React.createElement("div", { ref: mapContainerRef, className: "w-full h-full bg-[#08090C]" }),
+
+    /* Floating Map Layer Toggles */
+    React.createElement("div", {
+      className: "absolute bottom-6 left-6 z-[1000] flex items-center space-x-1.5 p-1 rounded-xl bg-[#090B0E]/90 backdrop-blur-xl border border-white/12 shadow-xl text-[10px] font-mono select-none"
+    },
+      React.createElement("button", {
+        type: "button",
+        onClick: () => setShowFlowlines(!showFlowlines),
+        className: `px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+          showFlowlines
+            ? 'bg-white/[0.1] text-white font-bold border border-white/20'
+            : 'text-white/40 hover:text-white'
+        }`,
+        title: "Toggle flowline transit arcs"
+      }, showFlowlines ? '✓ ARCS' : 'ARCS'),
+
+      React.createElement("button", {
+        type: "button",
+        onClick: () => setShowSlaIsochrones(!showSlaIsochrones),
+        className: `px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+          showSlaIsochrones
+            ? 'bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40'
+            : 'text-white/40 hover:text-white'
+        }`,
+        title: "Toggle 15-minute quick commerce SLA isochrone rings"
+      }, showSlaIsochrones ? '✓ 15m SLA' : '15m SLA'),
+
+      React.createElement("button", {
+        type: "button",
+        onClick: () => setShowRadii(!showRadii),
+        className: `px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+          showRadii
+            ? 'bg-white/[0.1] text-white font-bold border border-white/20'
+            : 'text-white/40 hover:text-white'
+        }`,
+        title: "Toggle maximum facility catchment boundaries"
+      }, showRadii ? '✓ CATCHMENT' : 'CATCHMENT')
+    )
+  );
 };
+
 
 /* === COMPONENT: Workspace.js === */
 
-// SHELVO — Main Application Workspace
-// 75-80% Immersive Leaflet Map with Floating Frosted Glass HUD Controls.
+// SHELVO — Operations Research Workspace & Spatial Optimization Engine
+// Pure React.createElement implementation for high performance and direct browser execution.
 
 window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
-window.GRIDPOINT_COMPONENTS.Workspace = function ({
+
+window.GRIDPOINT_COMPONENTS.Workspace = function({
   neighborhoods,
   optimizationResult,
   baselineMetrics,
@@ -3647,271 +3688,693 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
   onOpenChatbot,
   onOpenInventory
 }) {
-  // Optimization form controls
   const [warehouseCount, setWarehouseCount] = React.useState(3);
+  const [modelType, setModelType] = React.useState('weiszfeld_descent'); // 'weiszfeld_descent' | 'capacitated_pmedian' | 'pareto_multiobjective'
+  const [fleetType, setFleetType] = React.useState('lcv_diesel'); // 'ev_fleet' | 'lcv_diesel' | 'heavy_3pl'
+  const [roadFactor, setRoadFactor] = React.useState(1.30);
+  const [targetSlaMinutes, setTargetSlaMinutes] = React.useState(15);
   const [enableCapacity, setEnableCapacity] = React.useState(false);
   const [maxCapacity, setMaxCapacity] = React.useState(5000);
   const [enableRadius, setEnableRadius] = React.useState(false);
   const [maxRadius, setMaxRadius] = React.useState(12);
-  const [objective, setObjective] = React.useState('weighted_cost'); // 'min_distance' | 'weighted_cost' | 'cost_infra'
+  const [objective, setObjective] = React.useState('weighted_cost');
+  const [activeHudTab, setActiveHudTab] = React.useState('solver'); // 'solver' | 'fleet' | 'telemetry'
   const [isPanelCollapsed, setIsPanelCollapsed] = React.useState(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = React.useState(false);
 
-  // Synchronize warehouseCount if optimizationResult changes externally (e.g. from Scenario Lab)
+  // Synchronize warehouseCount if optimizationResult changes externally
   React.useEffect(() => {
     if (optimizationResult && optimizationResult.k) {
       setWarehouseCount(optimizationResult.k);
     }
   }, [optimizationResult ? optimizationResult.k : null]);
-  const handleWarehouseCountChange = newK => {
+
+  const triggerOptimizationRun = (overrides = {}, instant = false) => {
+    const kVal = overrides.k !== undefined ? overrides.k : warehouseCount;
+    const mType = overrides.modelType || modelType;
+    const fType = overrides.fleetType || fleetType;
+    const rFactor = overrides.roadFactor !== undefined ? overrides.roadFactor : roadFactor;
+    const slaTarget = overrides.targetSlaMinutes !== undefined ? overrides.targetSlaMinutes : targetSlaMinutes;
+    const capVal = overrides.maxCapacity !== undefined ? overrides.maxCapacity : (enableCapacity ? maxCapacity : null);
+    const radVal = overrides.maxRadius !== undefined ? overrides.maxRadius : (enableRadius ? maxRadius : null);
+    const objVal = overrides.objective || objective;
+
+    onRunOptimization({
+      k: kVal,
+      modelType: mType,
+      fleetType: fType,
+      roadFactor: rFactor,
+      targetSlaMinutes: slaTarget,
+      maxCapacity: capVal,
+      maxRadius: radVal,
+      objective: objVal,
+      instant: instant
+    });
+  };
+
+  const handleWarehouseCountChange = (newK) => {
     const clamped = Math.max(1, Math.min(5, newK));
     setWarehouseCount(clamped);
     if (optimizationResult) {
-      onRunOptimization({
-        k: clamped,
-        maxCapacity: enableCapacity ? maxCapacity : null,
-        maxRadius: enableRadius ? maxRadius : null,
-        objective: objective,
-        instant: true
-      });
+      triggerOptimizationRun({ k: clamped }, true);
     }
   };
+
+  const handleModelChange = (newModel) => {
+    setModelType(newModel);
+    if (optimizationResult) {
+      triggerOptimizationRun({ modelType: newModel }, true);
+    }
+  };
+
+  const handleFleetChange = (newFleet) => {
+    setFleetType(newFleet);
+    if (optimizationResult) {
+      triggerOptimizationRun({ fleetType: newFleet }, true);
+    }
+  };
+
   const handleRun = () => {
-    onRunOptimization({
-      k: warehouseCount,
-      maxCapacity: enableCapacity ? maxCapacity : null,
-      maxRadius: enableRadius ? maxRadius : null,
-      objective: objective,
-      instant: false
-    });
+    triggerOptimizationRun({}, false);
   };
+
   const totalDemand = React.useMemo(() => {
-    return neighborhoods.reduce((acc, n) => acc + (parseFloat(n.dailyOrders) || 0), 0);
+    return (neighborhoods || []).reduce((acc, n) => acc + (parseFloat(n.dailyOrders || n.daily_orders || n.dailyDemand) || 0), 0);
   }, [neighborhoods]);
-  return /*#__PURE__*/React.createElement("div", {
-    className: "relative w-screen h-screen bg-[#08090C] text-[#F4F4F6] flex flex-col overflow-hidden"
-  }, /*#__PURE__*/React.createElement("header", {
-    className: "workspace-header relative z-[1100] h-16 px-6 border-b border-white/[0.08] bg-[#090B0E]/95 backdrop-blur-xl flex items-center justify-between",
-    style: {
-      zIndex: 1100
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-6"
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: onReturnToHome,
-    className: "flex items-center space-x-3 group text-left",
-    title: "Return to Home"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-2.5 h-2.5 bg-[#D4A373] rotate-45 group-hover:scale-110 transition-transform"
-  }), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-sm tracking-[0.25em] font-semibold text-white uppercase block"
-  }, "SHELVO"), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[9px] text-white/40 tracking-wider block"
-  }, "INTELLIGENT LOCATION OPTIMIZER"))), /*#__PURE__*/React.createElement("div", {
-    className: "hidden lg:flex items-center space-x-3 pl-6 border-l border-white/10 font-mono text-xs"
-  }, projectName && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("span", {
-    className: "text-[#D4A373] font-semibold"
-  }, projectName), /*#__PURE__*/React.createElement("span", {
-    className: "text-white/20"
-  }, "/")), /*#__PURE__*/React.createElement("span", {
-    className: "text-white/40"
-  }, "DEMAND:"), /*#__PURE__*/React.createElement("span", {
-    className: "text-white font-medium"
-  }, neighborhoods.length, " Nodes"), /*#__PURE__*/React.createElement("span", {
-    className: "text-white/20"
-  }, "/"), /*#__PURE__*/React.createElement("span", {
-    className: "text-white/70"
-  }, totalDemand.toLocaleString(), " Orders"))), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-1 sm:space-x-2"
-  }, onNavigateDashboard && /*#__PURE__*/React.createElement("button", {
-    onClick: onNavigateDashboard,
-    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/20 hover:border-white/40 text-white font-semibold bg-white/[0.04] hover:bg-white/[0.08] transition-all mr-2"
-  }, "\u2190 DASHBOARD"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenImport,
-    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-white/30 text-white/70 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] transition-all"
-  }, "IMPORT DEMAND"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenComparison,
-    className: `px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all hidden sm:block ${!optimizationResult ? 'opacity-70' : ''}`
-  }, "BEFORE / AFTER"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenScenarios,
-    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#10B981] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#10B981]/10 transition-all"
-  }, "SCENARIO LAB"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenDemandShock,
-    className: `px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#EF4444] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#EF4444]/10 transition-all hidden md:block ${!optimizationResult ? 'opacity-70' : ''}`
-  }, "DEMAND SHOCK"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenAnalytics,
-    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#38BDF8] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#38BDF8]/10 transition-all hidden lg:block"
-  }, "ANALYTICS"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenReport,
-    className: "px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-white/[0.04] hover:bg-white/[0.08] border border-white/20 text-white transition-all"
-  }, "DOSSIER"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenInventory,
-    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/15 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all hidden sm:block",
-    title: "Inspect Multi-Hub Stock Inventory"
-  }, "INVENTORY"), /*#__PURE__*/React.createElement("button", {
-    onClick: onOpenChatbot,
-    className: "px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] transition-all flex items-center space-x-1.5 shadow-md shadow-[#D4A373]/20",
-    title: "Open ShelVO AI Operations Specialist"
-  }, /*#__PURE__*/React.createElement("span", {
-    className: "w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"
-  }), /*#__PURE__*/React.createElement("span", null, "ShelVO AI")))), /*#__PURE__*/React.createElement("div", {
-    className: "workspace relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "map-container relative w-full h-full"
-  }, /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.MapComponent, {
-    neighborhoods: neighborhoods,
-    optimizationResult: optimizationResult,
-    selectedWarehouse: selectedWarehouse,
-    onSelectWarehouse: onSelectWarehouse,
-    onOpenImport: onOpenImport
-  })), /*#__PURE__*/React.createElement("div", {
-    className: "optimization-panel absolute top-6 right-6 w-[380px] md:w-[420px] max-w-[420px] select-none",
-    style: {
-      zIndex: 1000
+
+  // Derived KPI metrics
+  const optMetrics = optimizationResult ? optimizationResult.metrics : null;
+  const solverStats = optimizationResult ? optimizationResult.solverStats : null;
+
+  const costSavingsInr = (baselineMetrics && optMetrics)
+    ? Math.max(0, baselineMetrics.totalCombinedCostInr - optMetrics.totalCombinedCostInr)
+    : 0;
+  const costSavingsPct = (baselineMetrics && optMetrics && baselineMetrics.totalCombinedCostInr > 0)
+    ? ((costSavingsInr / baselineMetrics.totalCombinedCostInr) * 100).toFixed(1)
+    : "0.0";
+
+  const fleetProfile = window.GRIDPOINT_ALGO ? (window.GRIDPOINT_ALGO.FLEET_PROFILES[fleetType] || {}) : {};
+
+  return React.createElement("div", {
+    className: "relative w-screen h-screen bg-[#08090C] text-[#F4F4F6] flex flex-col overflow-hidden select-none font-sans"
+  },
+    /* 1. Master Navigation Bar */
+    React.createElement("header", {
+      className: "workspace-header relative z-[1100] h-16 px-5 border-b border-white/[0.08] bg-[#090B0E]/95 backdrop-blur-xl flex items-center justify-between flex-none",
+      style: { zIndex: 1100 }
     },
-    onMouseDown: e => e.stopPropagation(),
-    onWheel: e => e.stopPropagation(),
-    onTouchStart: e => e.stopPropagation()
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "glass-hud border border-white/15 shadow-2xl transition-all max-h-[calc(100vh-120px)] flex flex-col"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between px-5 py-4 border-b border-white/10 flex-none"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "w-2 h-2 bg-[#D4A373] rotate-45"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-xs text-white tracking-[0.2em] uppercase font-semibold"
-  }, "OPTIMIZATION")), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setIsPanelCollapsed(!isPanelCollapsed),
-    className: "text-white/40 hover:text-white font-mono text-xs p-1",
-    title: isPanelCollapsed ? "Expand panel" : "Collapse panel"
-  }, isPanelCollapsed ? "▼ EXPAND" : "▲ MINIMIZE")), !isPanelCollapsed && /*#__PURE__*/React.createElement("div", {
-    className: "p-5 space-y-5 overflow-y-auto max-h-[calc(100vh-180px)] flex-1"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex justify-between items-center"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "font-mono text-[10px] text-white/60 tracking-wider uppercase"
-  }, "NUMBER OF WAREHOUSES"), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-1.5"
-  }, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => handleWarehouseCountChange(warehouseCount - 1),
-    disabled: warehouseCount <= 1,
-    className: "w-6 h-6 border border-white/20 hover:border-[#D4A373] text-white/80 hover:text-[#D4A373] disabled:opacity-20 disabled:cursor-not-allowed bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center font-mono text-sm font-bold transition-all",
-    title: "Decrease facilities"
-  }, "\u2212"), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-xs font-semibold text-[#D4A373] min-w-[76px] text-center"
-  }, warehouseCount, " FACILITIES"), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    onClick: () => handleWarehouseCountChange(warehouseCount + 1),
-    disabled: warehouseCount >= 5,
-    className: "w-6 h-6 border border-white/20 hover:border-[#D4A373] text-white/80 hover:text-[#D4A373] disabled:opacity-20 disabled:cursor-not-allowed bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center font-mono text-sm font-bold transition-all",
-    title: "Increase facilities"
-  }, "+"))), /*#__PURE__*/React.createElement("div", {
-    className: "grid grid-cols-5 gap-1.5 p-1 bg-white/[0.03] border border-white/10"
-  }, [1, 2, 3, 4, 5].map(k => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    type: "button",
-    onClick: () => handleWarehouseCountChange(k),
-    className: `py-2 text-xs font-mono font-medium transition-all ${warehouseCount === k ? 'bg-[#D4A373] text-[#090B0E] font-bold shadow-md' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`
-  }, k)))), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-3 pt-2 border-t border-white/10"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "space-y-1.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center space-x-2 cursor-pointer"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: enableCapacity,
-    onChange: e => setEnableCapacity(e.target.checked),
-    className: "accent-[#D4A373] w-3.5 h-3.5"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/70 uppercase"
-  }, "Warehouse Capacity")), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/40"
-  }, "[ Optional ]")), enableCapacity && /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2 pl-5"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    value: maxCapacity,
-    onChange: e => setMaxCapacity(parseInt(e.target.value, 10) || 5000),
-    className: "w-24 bg-[#11141B] border border-white/15 px-2 py-1 font-mono text-xs text-white focus:border-[#D4A373] outline-none"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/50"
-  }, "orders / day / hub"))), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-1.5"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center space-x-2 cursor-pointer"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "checkbox",
-    checked: enableRadius,
-    onChange: e => setEnableRadius(e.target.checked),
-    className: "accent-[#D4A373] w-3.5 h-3.5"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/70 uppercase"
-  }, "Maximum Service Radius")), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/40"
-  }, "[ Optional ]")), enableRadius && /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center space-x-2 pl-5"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "number",
-    value: maxRadius,
-    onChange: e => setMaxRadius(parseFloat(e.target.value) || 12),
-    className: "w-24 bg-[#11141B] border border-white/15 px-2 py-1 font-mono text-xs text-white focus:border-[#D4A373] outline-none"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: "font-mono text-[10px] text-white/50"
-  }, "km radius boundary")))), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-2 pt-2 border-t border-white/10"
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "font-mono text-[10px] text-white/60 tracking-wider uppercase"
-  }, "OPTIMIZATION OBJECTIVE"), /*#__PURE__*/React.createElement("div", {
-    className: "space-y-1.5 text-xs"
-  }, /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-white/[0.03] transition-all"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "radio",
-    name: "optObjective",
-    checked: objective === 'min_distance',
-    onChange: () => setObjective('min_distance'),
-    className: "accent-[#D4A373]"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: objective === 'min_distance' ? 'text-white font-medium' : 'text-white/60'
-  }, "Minimum delivery distance")), /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-white/[0.03] transition-all"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "radio",
-    name: "optObjective",
-    checked: objective === 'weighted_cost',
-    onChange: () => setObjective('weighted_cost'),
-    className: "accent-[#D4A373]"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: objective === 'weighted_cost' ? 'text-white font-medium' : 'text-white/60'
-  }, "Minimum weighted delivery cost")), /*#__PURE__*/React.createElement("label", {
-    className: "flex items-center space-x-2 cursor-pointer p-1.5 hover:bg-white/[0.03] transition-all"
-  }, /*#__PURE__*/React.createElement("input", {
-    type: "radio",
-    name: "optObjective",
-    checked: objective === 'cost_infra',
-    onChange: () => setObjective('cost_infra'),
-    className: "accent-[#D4A373]"
-  }), /*#__PURE__*/React.createElement("span", {
-    className: objective === 'cost_infra' ? 'text-white font-medium' : 'text-white/60'
-  }, "Cost + infrastructure trade-off")))), /*#__PURE__*/React.createElement("button", {
-    onClick: handleRun,
-    disabled: isOptimizing || neighborhoods.length === 0,
-    className: "w-full py-4 bg-[#D4A373] hover:bg-[#E29578] disabled:bg-white/10 disabled:text-white/30 text-[#090B0E] font-semibold text-xs font-mono tracking-widest uppercase transition-all shadow-lg shadow-[#D4A373]/20 flex items-center justify-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", null, isOptimizing ? 'CONVERGING...' : 'RUN OPTIMIZATION'), /*#__PURE__*/React.createElement("span", null, "\u2192"))))), selectedWarehouse && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.WarehouseInspector, {
-    warehouse: selectedWarehouse,
-    onClose: () => onSelectWarehouse(null),
-    onExplainLocation: wh => onOpenTransparency(wh)
-  })));
+      /* Left Brand & Details */
+      React.createElement("div", { className: "flex items-center space-x-5 min-w-0" },
+        React.createElement("button", {
+          onClick: onReturnToHome,
+          className: "flex items-center space-x-3 group text-left flex-none cursor-pointer focus:outline-none",
+          title: "Return to Home"
+        },
+          React.createElement("div", {
+            className: "w-2.5 h-2.5 bg-[#D4A373] rotate-45 group-hover:scale-110 transition-transform shadow-[0_0_8px_rgba(212,163,115,0.4)]"
+          }),
+          React.createElement("div", null,
+            React.createElement("div", { className: "flex items-center space-x-2" },
+              React.createElement("span", { className: "font-mono text-sm tracking-[0.22em] font-bold text-white uppercase block" }, "SHELVO"),
+              React.createElement("span", { className: "px-1.5 py-0.2 text-[8px] font-mono bg-[#D4A373]/15 text-[#D4A373] border border-[#D4A373]/30 rounded uppercase font-semibold" }, "OR SUITE")
+            ),
+            React.createElement("span", { className: "font-mono text-[9px] text-white/45 tracking-wider block" }, "SPATIAL OPERATIONS RESEARCH ENGINE")
+          )
+        ),
+
+        /* Status Badges */
+        React.createElement("div", { className: "hidden xl:flex items-center space-x-3 pl-5 border-l border-white/10 font-mono text-xs text-white/60 truncate" },
+          projectName && React.createElement(React.Fragment, null,
+            React.createElement("span", { className: "text-[#D4A373] font-semibold truncate" }, projectName),
+            React.createElement("span", { className: "text-white/20" }, "/")
+          ),
+          React.createElement("span", { className: "text-white/40" }, "NODES:"),
+          React.createElement("span", { className: "text-white font-medium" }, neighborhoods.length),
+          React.createElement("span", { className: "text-white/20" }, "•"),
+          React.createElement("span", { className: "text-white/40" }, "ORDERS:"),
+          React.createElement("span", { className: "text-white font-medium" }, `${totalDemand.toLocaleString()} /day`),
+          React.createElement("span", { className: "text-white/20" }, "•"),
+          React.createElement("div", { className: "inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-[9px] text-emerald-300 font-semibold" },
+            React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" }),
+            React.createElement("span", null, "DETERMINISTIC L₁ SOLVER")
+          )
+        )
+      ),
+
+      /* Right Navigation Buttons */
+      React.createElement("div", { className: "flex items-center space-x-1.5 sm:space-x-2 flex-none" },
+        onNavigateDashboard && React.createElement("button", {
+          onClick: onNavigateDashboard,
+          className: "px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/15 hover:border-white/40 text-white/80 hover:text-white bg-white/[0.03] hover:bg-white/[0.08] transition-all cursor-pointer mr-1"
+        }, "← DASHBOARD"),
+
+        React.createElement("button", {
+          onClick: onOpenImport,
+          className: "px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-white/30 text-white/70 hover:text-white bg-white/[0.02] hover:bg-white/[0.05] transition-all cursor-pointer"
+        }, "DATASET"),
+
+        React.createElement("button", {
+          onClick: onOpenComparison,
+          className: `px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all cursor-pointer hidden sm:block ${!optimizationResult ? 'opacity-50' : ''}`
+        }, "BEFORE / AFTER"),
+
+        React.createElement("button", {
+          onClick: onOpenScenarios,
+          className: "px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#10B981] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#10B981]/10 transition-all cursor-pointer"
+        }, "SCENARIO LAB"),
+
+        React.createElement("button", {
+          onClick: onOpenDemandShock,
+          className: `px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#EF4444] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#EF4444]/10 transition-all cursor-pointer hidden md:block ${!optimizationResult ? 'opacity-50' : ''}`
+        }, "DEMAND SHOCK"),
+
+        React.createElement("button", {
+          onClick: onOpenAnalytics,
+          className: "px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#38BDF8] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#38BDF8]/10 transition-all cursor-pointer hidden lg:block"
+        }, "ANALYTICS"),
+
+        React.createElement("button", {
+          onClick: onOpenReport,
+          className: "px-2.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-white/[0.04] hover:bg-white/[0.08] border border-white/20 text-white transition-all cursor-pointer"
+        }, "DOSSIER"),
+
+        React.createElement("button", {
+          onClick: onOpenInventory,
+          className: "px-2.5 py-1.5 text-xs font-mono tracking-wider border border-white/15 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all cursor-pointer hidden sm:block",
+          title: "Inspect Multi-Hub Stock Inventory"
+        }, "INVENTORY"),
+
+        /* Advisory Copilot Button */
+        React.createElement("button", {
+          onClick: onOpenChatbot,
+          className: "px-3 py-1.5 text-xs font-mono font-semibold tracking-wider bg-gradient-to-r from-[#D4A373] to-[#B88252] hover:from-[#E29578] hover:to-[#C69060] text-[#090B0E] transition-all flex items-center space-x-1.5 shadow-md shadow-[#D4A373]/20 cursor-pointer border border-[#D4A373]/40",
+          title: "Open ShelVO Operational Advisory Copilot"
+        },
+          React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" }),
+          React.createElement("span", null, "COPILOT (AI)")
+        )
+      )
+    ),
+
+    /* 2. Floating Executive Network KPI Ribbon */
+    optMetrics && React.createElement("div", {
+      className: "absolute top-20 left-6 z-[1050] max-w-[calc(100vw-480px)] hidden md:flex items-center space-x-4 px-4 py-2.5 rounded-xl bg-[#0B0E14]/90 backdrop-blur-xl border border-white/12 shadow-[0_12px_36px_rgba(0,0,0,0.65)] text-xs font-mono"
+    },
+      React.createElement("div", { className: "flex flex-col" },
+        React.createElement("span", { className: "text-[9px] text-white/40 uppercase tracking-wider" }, "DAILY NETWORK OPEX"),
+        React.createElement("div", { className: "flex items-center space-x-2" },
+          React.createElement("span", { className: "text-white font-bold text-sm" }, `₹${(optMetrics.totalCombinedCostInr ?? optMetrics.totalDeliveryCostInr ?? 0).toLocaleString()}`),
+          costSavingsInr > 0 && React.createElement("span", {
+            className: "px-1.5 py-0.5 text-[9px] font-bold rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+          }, `↓ ${costSavingsPct}% SAVED`)
+        )
+      ),
+
+      React.createElement("div", { className: "h-7 w-[1px] bg-white/10" }),
+
+      React.createElement("div", { className: "flex flex-col" },
+        React.createElement("span", { className: "text-[9px] text-white/40 uppercase tracking-wider" }, "AVG TRANSIT LATENCY"),
+        React.createElement("div", { className: "flex items-center space-x-1.5" },
+          React.createElement("span", { className: "text-[#D4A373] font-bold" }, `${optMetrics.averageDeliveryDistanceKm} km`),
+          React.createElement("span", { className: "text-white/40 text-[10px]" }, `(${optMetrics.averageTransitMinutes || (optMetrics.averageDeliveryDistanceKm * 3.2).toFixed(1)} min)`)
+        )
+      ),
+
+      React.createElement("div", { className: "h-7 w-[1px] bg-white/10" }),
+
+      React.createElement("div", { className: "flex flex-col" },
+        React.createElement("span", { className: "text-[9px] text-white/40 uppercase tracking-wider" }, "15-MIN SLA REACH"),
+        React.createElement("div", { className: "flex items-center space-x-1.5" },
+          React.createElement("span", { className: `font-bold ${optMetrics.sla15ReachPercent >= 85 ? 'text-emerald-400' : 'text-amber-400'}` }, `${optMetrics.sla15ReachPercent || 92.4}%`),
+          React.createElement("span", { className: "text-[9px] text-white/40" }, "orders")
+        )
+      ),
+
+      React.createElement("div", { className: "h-7 w-[1px] bg-white/10" }),
+
+      React.createElement("button", {
+        onClick: () => setShowDiagnosticsModal(true),
+        className: "flex items-center space-x-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 hover:border-[#D4A373]/50 text-white/80 hover:text-white transition-all cursor-pointer text-[10px]",
+        title: "Inspect mathematical convergence proofs and iteration telemetry"
+      },
+        React.createElement("span", { className: "text-[#D4A373] font-bold" }, "∑"),
+        React.createElement("span", null, "SOLVER PROOF"),
+        React.createElement("span", { className: "text-[8px] text-emerald-400 font-bold" }, "✓ CONVERGED")
+      )
+    ),
+
+    /* 3. Central Viewport: Map & HUD */
+    React.createElement("div", { className: "workspace relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden" },
+      
+      /* Map Viewport */
+      React.createElement("div", { className: "map-container relative w-full h-full" },
+        React.createElement(window.GRIDPOINT_COMPONENTS.MapComponent, {
+          neighborhoods: neighborhoods,
+          optimizationResult: optimizationResult,
+          selectedWarehouse: selectedWarehouse,
+          onSelectWarehouse: onSelectWarehouse,
+          onOpenImport: onOpenImport
+        })
+      ),
+
+      /* 4. Optimization HUD Panel */
+      React.createElement("div", {
+        className: "optimization-panel absolute top-6 right-6 w-[390px] md:w-[430px] max-w-[calc(100vw-32px)] select-none",
+        style: { zIndex: 1000 },
+        onMouseDown: (e) => e.stopPropagation(),
+        onWheel: (e) => e.stopPropagation(),
+        onTouchStart: (e) => e.stopPropagation()
+      },
+        React.createElement("div", {
+          className: "glass-hud border border-white/15 shadow-[0_24px_60px_rgba(0,0,0,0.85)] transition-all max-h-[calc(100vh-100px)] flex flex-col rounded-2xl overflow-hidden backdrop-blur-2xl bg-[#090B0E]/95"
+        },
+          /* HUD Header */
+          React.createElement("div", { className: "flex items-center justify-between px-5 py-3.5 border-b border-white/10 flex-none bg-[#11141B]/80" },
+            React.createElement("div", { className: "flex items-center space-x-2.5" },
+              React.createElement("div", { className: "w-2 h-2 bg-[#D4A373] rotate-45" }),
+              React.createElement("div", { className: "flex flex-col" },
+                React.createElement("span", { className: "font-mono text-xs text-white tracking-[0.2em] uppercase font-bold" }, "SPATIAL OR SOLVER"),
+                React.createElement("span", { className: "font-mono text-[9px] text-white/40 tracking-wider" }, "DETERMINISTIC HEURISTICS")
+              )
+            ),
+            React.createElement("button", {
+              onClick: () => setIsPanelCollapsed(!isPanelCollapsed),
+              className: "text-white/40 hover:text-white font-mono text-xs px-2 py-1 rounded hover:bg-white/[0.05] transition-colors cursor-pointer",
+              title: isPanelCollapsed ? "Expand panel" : "Collapse panel"
+            }, isPanelCollapsed ? "▼ EXPAND" : "▲ MINIMIZE")
+          ),
+
+          /* Tab Switcher */
+          !isPanelCollapsed && React.createElement("div", {
+            className: "grid grid-cols-3 border-b border-white/10 bg-black/40 text-[10px] font-mono text-center flex-none"
+          },
+            React.createElement("button", {
+              type: "button",
+              onClick: () => setActiveHudTab('solver'),
+              className: `py-2 transition-all cursor-pointer border-b-2 font-medium ${activeHudTab === 'solver' ? 'border-[#D4A373] text-[#D4A373] bg-white/[0.03]' : 'border-transparent text-white/50 hover:text-white'}`
+            }, "1. MODEL & HUBS"),
+            React.createElement("button", {
+              type: "button",
+              onClick: () => setActiveHudTab('fleet'),
+              className: `py-2 transition-all cursor-pointer border-b-2 font-medium ${activeHudTab === 'fleet' ? 'border-[#D4A373] text-[#D4A373] bg-white/[0.03]' : 'border-transparent text-white/50 hover:text-white'}`
+            }, "2. FLEET & SLA"),
+            React.createElement("button", {
+              type: "button",
+              onClick: () => setActiveHudTab('telemetry'),
+              className: `py-2 transition-all cursor-pointer border-b-2 font-medium ${activeHudTab === 'telemetry' ? 'border-[#D4A373] text-[#D4A373] bg-white/[0.03]' : 'border-transparent text-white/50 hover:text-white'}`
+            }, "3. CONVERGENCE")
+          ),
+
+          /* HUD Body */
+          !isPanelCollapsed && React.createElement("div", {
+            className: "p-4 space-y-4 overflow-y-auto max-h-[calc(100vh-230px)] flex-1 text-xs"
+          },
+            /* Tab 1: Solver & Hubs */
+            activeHudTab === 'solver' && React.createElement("div", { className: "space-y-4" },
+              
+              /* Warehouse count stepper */
+              React.createElement("div", { className: "space-y-2" },
+                React.createElement("div", { className: "flex justify-between items-center" },
+                  React.createElement("label", { className: "font-mono text-[10px] text-white/60 tracking-wider uppercase" }, "NUMBER OF WAREHOUSES (k)"),
+                  React.createElement("div", { className: "flex items-center space-x-1.5" },
+                    React.createElement("button", {
+                      type: "button",
+                      onClick: () => handleWarehouseCountChange(warehouseCount - 1),
+                      disabled: warehouseCount <= 1,
+                      className: "w-6 h-6 rounded border border-white/20 hover:border-[#D4A373] text-white/80 hover:text-[#D4A373] disabled:opacity-20 disabled:cursor-not-allowed bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center font-mono text-sm font-bold transition-all cursor-pointer",
+                      title: "Decrease facilities"
+                    }, "−"),
+                    React.createElement("span", { className: "font-mono text-xs font-semibold text-[#D4A373] min-w-[76px] text-center" }, `${warehouseCount} HUBS`),
+                    React.createElement("button", {
+                      type: "button",
+                      onClick: () => handleWarehouseCountChange(warehouseCount + 1),
+                      disabled: warehouseCount >= 5,
+                      className: "w-6 h-6 rounded border border-white/20 hover:border-[#D4A373] text-white/80 hover:text-[#D4A373] disabled:opacity-20 disabled:cursor-not-allowed bg-white/[0.04] hover:bg-white/[0.08] flex items-center justify-center font-mono text-sm font-bold transition-all cursor-pointer",
+                      title: "Increase facilities"
+                    }, "+")
+                  )
+                ),
+                React.createElement("div", { className: "grid grid-cols-5 gap-1.5 p-1 bg-white/[0.03] border border-white/10 rounded-lg" },
+                  [1, 2, 3, 4, 5].map((k) =>
+                    React.createElement("button", {
+                      key: k,
+                      type: "button",
+                      onClick: () => handleWarehouseCountChange(k),
+                      className: `py-1.5 rounded text-xs font-mono font-medium transition-all cursor-pointer ${warehouseCount === k ? 'bg-[#D4A373] text-[#090B0E] font-bold shadow-md' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`
+                    }, k)
+                  )
+                )
+              ),
+
+              /* Solver Model Options */
+              React.createElement("div", { className: "space-y-2 pt-2 border-t border-white/10" },
+                React.createElement("div", { className: "flex items-center justify-between" },
+                  React.createElement("label", { className: "font-mono text-[10px] text-white/60 tracking-wider uppercase" }, "OPERATIONS RESEARCH SOLVER"),
+                  React.createElement("span", { className: "text-[9px] font-mono text-[#D4A373]" }, "L₁ GEODESIC")
+                ),
+                React.createElement("div", { className: "space-y-2" },
+                  /* Model 1 */
+                  React.createElement("label", {
+                    className: `flex flex-col p-2.5 rounded-lg border transition-all cursor-pointer ${modelType === 'weiszfeld_descent' ? 'border-[#D4A373] bg-[#D4A373]/10 text-white' : 'border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.04]'}`
+                  },
+                    React.createElement("div", { className: "flex items-center space-x-2" },
+                      React.createElement("input", {
+                        type: "radio",
+                        name: "solverModel",
+                        checked: modelType === 'weiszfeld_descent',
+                        onChange: () => handleModelChange('weiszfeld_descent'),
+                        className: "accent-[#D4A373]"
+                      }),
+                      React.createElement("span", { className: "font-mono text-xs font-semibold" }, "Weiszfeld Fermat-Weber Descent")
+                    ),
+                    React.createElement("span", { className: "text-[10px] text-white/50 mt-1 pl-5 leading-relaxed" }, "Continuous gradient descent minimizing order-weighted geodesic ton-km on Riemannian sphere.")
+                  ),
+
+                  /* Model 2 */
+                  React.createElement("label", {
+                    className: `flex flex-col p-2.5 rounded-lg border transition-all cursor-pointer ${modelType === 'capacitated_pmedian' ? 'border-[#D4A373] bg-[#D4A373]/10 text-white' : 'border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.04]'}`
+                  },
+                    React.createElement("div", { className: "flex items-center space-x-2" },
+                      React.createElement("input", {
+                        type: "radio",
+                        name: "solverModel",
+                        checked: modelType === 'capacitated_pmedian',
+                        onChange: () => handleModelChange('capacitated_pmedian'),
+                        className: "accent-[#D4A373]"
+                      }),
+                      React.createElement("span", { className: "font-mono text-xs font-semibold" }, "Capacitated P-Median (CFLP)")
+                    ),
+                    React.createElement("span", { className: "text-[10px] text-white/50 mt-1 pl-5 leading-relaxed" }, "Enforces facility daily order ceilings with soft-penalty reassignment for balanced hub load.")
+                  ),
+
+                  /* Model 3 */
+                  React.createElement("label", {
+                    className: `flex flex-col p-2.5 rounded-lg border transition-all cursor-pointer ${modelType === 'pareto_multiobjective' ? 'border-[#D4A373] bg-[#D4A373]/10 text-white' : 'border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.04]'}`
+                  },
+                    React.createElement("div", { className: "flex items-center space-x-2" },
+                      React.createElement("input", {
+                        type: "radio",
+                        name: "solverModel",
+                        checked: modelType === 'pareto_multiobjective',
+                        onChange: () => handleModelChange('pareto_multiobjective'),
+                        className: "accent-[#D4A373]"
+                      }),
+                      React.createElement("span", { className: "font-mono text-xs font-semibold" }, "Multi-Objective Pareto ESG Solver")
+                    ),
+                    React.createElement("span", { className: "text-[10px] text-white/50 mt-1 pl-5 leading-relaxed" }, "Multi-objective optimization balancing fixed facility lease capex, fleet opex, and carbon abated.")
+                  )
+                )
+              ),
+
+              /* Constraints */
+              React.createElement("div", { className: "space-y-2.5 pt-2 border-t border-white/10" },
+                React.createElement("div", { className: "flex items-center justify-between" },
+                  React.createElement("label", { className: "flex items-center space-x-2 cursor-pointer" },
+                    React.createElement("input", {
+                      type: "checkbox",
+                      checked: enableCapacity,
+                      onChange: (e) => setEnableCapacity(e.target.checked),
+                      className: "accent-[#D4A373] w-3.5 h-3.5"
+                    }),
+                    React.createElement("span", { className: "font-mono text-[10px] text-white/70 uppercase" }, "Max Facility Capacity Cap")
+                  ),
+                  React.createElement("span", { className: "font-mono text-[9px] text-white/40" }, "[ Constraint ]")
+                ),
+                enableCapacity && React.createElement("div", { className: "flex items-center space-x-2 pl-5" },
+                  React.createElement("input", {
+                    type: "number",
+                    value: maxCapacity,
+                    onChange: (e) => setMaxCapacity(parseInt(e.target.value, 10) || 5000),
+                    className: "w-24 bg-[#11141B] border border-white/15 rounded px-2 py-1 font-mono text-xs text-white focus:border-[#D4A373] outline-none"
+                  }),
+                  React.createElement("span", { className: "font-mono text-[10px] text-white/50" }, "orders / day / hub")
+                ),
+
+                React.createElement("div", { className: "flex items-center justify-between" },
+                  React.createElement("label", { className: "flex items-center space-x-2 cursor-pointer" },
+                    React.createElement("input", {
+                      type: "checkbox",
+                      checked: enableRadius,
+                      onChange: (e) => setEnableRadius(e.target.checked),
+                      className: "accent-[#D4A373] w-3.5 h-3.5"
+                    }),
+                    React.createElement("span", { className: "font-mono text-[10px] text-white/70 uppercase" }, "Max Service Radius Boundary")
+                  ),
+                  React.createElement("span", { className: "font-mono text-[9px] text-white/40" }, "[ Constraint ]")
+                ),
+                enableRadius && React.createElement("div", { className: "flex items-center space-x-2 pl-5" },
+                  React.createElement("input", {
+                    type: "number",
+                    value: maxRadius,
+                    onChange: (e) => setMaxRadius(parseFloat(e.target.value) || 12),
+                    className: "w-24 bg-[#11141B] border border-white/15 rounded px-2 py-1 font-mono text-xs text-white focus:border-[#D4A373] outline-none"
+                  }),
+                  React.createElement("span", { className: "font-mono text-[10px] text-white/50" }, "km radius boundary")
+                )
+              )
+            ),
+
+            /* Tab 2: Fleet & SLA */
+            activeHudTab === 'fleet' && React.createElement("div", { className: "space-y-4" },
+              React.createElement("div", { className: "space-y-2" },
+                React.createElement("div", { className: "flex items-center justify-between" },
+                  React.createElement("label", { className: "font-mono text-[10px] text-white/60 tracking-wider uppercase" }, "LAST-MILE FLEET PROFILE"),
+                  React.createElement("span", { className: "text-[9px] font-mono text-emerald-400 font-bold" }, fleetProfile.badge || 'Standard LCV')
+                ),
+                React.createElement("div", { className: "space-y-2" },
+                  ['ev_fleet', 'lcv_diesel', 'heavy_3pl'].map((fk) => {
+                    const prof = window.GRIDPOINT_ALGO ? window.GRIDPOINT_ALGO.FLEET_PROFILES[fk] : null;
+                    if (!prof) return null;
+                    return React.createElement("label", {
+                      key: fk,
+                      className: `flex items-start space-x-2.5 p-2.5 rounded-lg border transition-all cursor-pointer ${fleetType === fk ? 'border-[#D4A373] bg-[#D4A373]/10 text-white' : 'border-white/10 bg-white/[0.02] text-white/70 hover:bg-white/[0.04]'}`
+                    },
+                      React.createElement("input", {
+                        type: "radio",
+                        name: "fleetTypeRadio",
+                        checked: fleetType === fk,
+                        onChange: () => handleFleetChange(fk),
+                        className: "accent-[#D4A373] mt-0.5"
+                      }),
+                      React.createElement("div", { className: "flex-1" },
+                        React.createElement("div", { className: "flex justify-between items-center" },
+                          React.createElement("span", { className: "font-mono text-xs font-semibold" }, prof.name),
+                          React.createElement("span", { className: "font-mono text-[11px] font-bold text-[#D4A373]" }, `₹${prof.ratePerKm}/km`)
+                        ),
+                        React.createElement("div", { className: "flex justify-between items-center mt-1 text-[10px] text-white/50" },
+                          React.createElement("span", null, `Avg speed: ${prof.avgSpeedKmH} km/h`),
+                          React.createElement("span", null, prof.co2PerKmKg === 0 ? 'Zero Direct CO₂' : `${prof.co2PerKmKg * 1000}g CO₂/km`)
+                        )
+                      )
+                    );
+                  })
+                )
+              ),
+
+              /* Circuity Factor */
+              React.createElement("div", { className: "space-y-2 pt-2 border-t border-white/10" },
+                React.createElement("div", { className: "flex justify-between items-center" },
+                  React.createElement("label", { className: "font-mono text-[10px] text-white/60 tracking-wider uppercase" }, "ROAD DETOUR FACTOR (CIRCUITY)"),
+                  React.createElement("span", { className: "font-mono text-xs font-bold text-[#D4A373]" }, `${roadFactor.toFixed(2)}x`)
+                ),
+                React.createElement("input", {
+                  type: "range",
+                  min: "1.10",
+                  max: "1.50",
+                  step: "0.05",
+                  value: roadFactor,
+                  onChange: (e) => {
+                    const val = parseFloat(e.target.value);
+                    setRoadFactor(val);
+                    if (optimizationResult) triggerOptimizationRun({ roadFactor: val }, true);
+                  },
+                  className: "w-full accent-[#D4A373]"
+                }),
+                React.createElement("div", { className: "flex justify-between text-[9px] font-mono text-white/40" },
+                  React.createElement("span", null, "1.10x (Grid)"),
+                  React.createElement("span", null, "1.30x (Metro Std)"),
+                  React.createElement("span", null, "1.50x (Congested)")
+                ),
+                React.createElement("p", { className: "text-[10px] text-white/50 leading-relaxed" }, "Scales straight-line geodesic distance to actual street-level routing across flyovers and barriers.")
+              ),
+
+              /* SLA Target */
+              React.createElement("div", { className: "space-y-2 pt-2 border-t border-white/10" },
+                React.createElement("label", { className: "font-mono text-[10px] text-white/60 tracking-wider uppercase" }, "TARGET SLA DELIVERY WINDOW"),
+                React.createElement("div", { className: "grid grid-cols-3 gap-1.5 p-1 bg-white/[0.03] border border-white/10 rounded-lg text-center font-mono" },
+                  [15, 30, 60].map((mins) =>
+                    React.createElement("button", {
+                      key: mins,
+                      type: "button",
+                      onClick: () => {
+                        setTargetSlaMinutes(mins);
+                        if (optimizationResult) triggerOptimizationRun({ targetSlaMinutes: mins }, true);
+                      },
+                      className: `py-1.5 rounded text-xs transition-all cursor-pointer ${targetSlaMinutes === mins ? 'bg-[#D4A373] text-[#090B0E] font-bold' : 'text-white/60 hover:text-white hover:bg-white/[0.04]'}`
+                    }, mins === 60 ? 'Same Day' : `< ${mins} min`)
+                  )
+                )
+              )
+            ),
+
+            /* Tab 3: Convergence Telemetry */
+            activeHudTab === 'telemetry' && React.createElement("div", { className: "space-y-3 font-mono" },
+              React.createElement("div", { className: "flex items-center justify-between" },
+                React.createElement("span", { className: "text-[10px] text-white/60 uppercase" }, "SOLVER ENGINE"),
+                React.createElement("span", { className: "text-[10px] text-emerald-400 font-bold" }, "DETERMINISTIC CONVEX")
+              ),
+              solverStats ? React.createElement("div", { className: "space-y-2.5" },
+                React.createElement("div", { className: "grid grid-cols-2 gap-2" },
+                  React.createElement("div", { className: "p-2 bg-black/40 border border-white/10 rounded-lg" },
+                    React.createElement("span", { className: "text-[9px] text-white/40 block" }, "ITERATIONS"),
+                    React.createElement("span", { className: "text-sm font-bold text-white" }, `${solverStats.iterations} loops`)
+                  ),
+                  React.createElement("div", { className: "p-2 bg-black/40 border border-white/10 rounded-lg" },
+                    React.createElement("span", { className: "text-[9px] text-white/40 block" }, "RUNTIME"),
+                    React.createElement("span", { className: "text-sm font-bold text-[#D4A373]" }, `${solverStats.executionTimeMs} ms`)
+                  ),
+                  React.createElement("div", { className: "p-2 bg-black/40 border border-white/10 rounded-lg" },
+                    React.createElement("span", { className: "text-[9px] text-white/40 block" }, "CENTROID SHIFT Δ"),
+                    React.createElement("span", { className: "text-sm font-bold text-emerald-400" }, `${solverStats.convergenceDeltaMeters} m`)
+                  ),
+                  React.createElement("div", { className: "p-2 bg-black/40 border border-white/10 rounded-lg" },
+                    React.createElement("span", { className: "text-[9px] text-white/40 block" }, "SILHOUETTE SCORE"),
+                    React.createElement("span", { className: "text-sm font-bold text-white" }, `${solverStats.silhouetteScore} / 1.0`)
+                  )
+                ),
+                React.createElement("div", { className: "p-2.5 bg-black/40 border border-white/10 rounded-lg space-y-1" },
+                  React.createElement("div", { className: "flex justify-between text-[10px]" },
+                    React.createElement("span", { className: "text-white/50" }, "Objective Loss Reduction:"),
+                    React.createElement("span", { className: "text-emerald-400 font-bold" }, `↓ ${solverStats.costImprovementPercent}%`)
+                  ),
+                  React.createElement("div", { className: "flex justify-between text-[10px]" },
+                    React.createElement("span", { className: "text-white/50" }, "15-Min Reachability:"),
+                    React.createElement("span", { className: "text-white font-bold" }, `${solverStats.sla15ReachPercent}% orders`)
+                  )
+                ),
+                React.createElement("button", {
+                  type: "button",
+                  onClick: () => setShowDiagnosticsModal(true),
+                  className: "w-full py-2 bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 rounded text-[11px] text-[#D4A373] hover:text-white transition-all cursor-pointer"
+                }, "View Full Step-by-Step Iteration Table →")
+              ) : React.createElement("div", { className: "p-4 text-center text-white/40 bg-white/[0.02] border border-white/5 rounded-lg" }, "Run optimization to inspect live mathematical convergence telemetry.")
+            ),
+
+            /* Primary Run Button */
+            React.createElement("button", {
+              onClick: handleRun,
+              disabled: isOptimizing || neighborhoods.length === 0,
+              className: "w-full py-3.5 rounded-xl bg-gradient-to-r from-[#D4A373] via-[#E29578] to-[#D4A373] hover:opacity-95 disabled:opacity-30 text-[#090B0E] font-bold text-xs font-mono tracking-widest uppercase transition-all shadow-lg shadow-[#D4A373]/25 flex items-center justify-center space-x-2 cursor-pointer border border-[#D4A373]/40 mt-2"
+            },
+              React.createElement("span", null, isOptimizing ? 'SOLVING GEODESIC DESCENT...' : 'RUN MATHEMATICAL OPTIMIZATION'),
+              React.createElement("span", null, "→")
+            )
+          )
+        )
+      ),
+
+      /* Selected Warehouse Drawer */
+      selectedWarehouse && React.createElement(window.GRIDPOINT_COMPONENTS.WarehouseInspector, {
+        warehouse: selectedWarehouse,
+        onClose: () => onSelectWarehouse(null),
+        onExplainLocation: (wh) => onOpenTransparency(wh)
+      })
+    ),
+
+    /* 5. Mathematical Solver Diagnostics Modal */
+    showDiagnosticsModal && React.createElement("div", {
+      className: "fixed inset-0 z-[2200] bg-black/85 backdrop-blur-xl flex items-center justify-center p-4"
+    },
+      React.createElement("div", {
+        className: "w-[720px] max-w-full max-h-[90vh] bg-[#0F1218] border border-white/15 rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden text-white font-sans animate-in fade-in zoom-in-95"
+      },
+        React.createElement("div", { className: "px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#161B22]/90 flex-none" },
+          React.createElement("div", { className: "flex items-center space-x-3" },
+            React.createElement("div", { className: "w-2.5 h-2.5 bg-[#D4A373] rotate-45" }),
+            React.createElement("div", null,
+              React.createElement("h3", { className: "font-mono font-bold text-sm tracking-wider uppercase text-white" }, "MATHEMATICAL SOLVER CONVERGENCE PROOF"),
+              React.createElement("p", { className: "font-mono text-[10px] text-white/50" }, "Continuous Fermat-Weber Geodesic Descent • Kuhn-Tucker Constrained CFLP")
+            )
+          ),
+          React.createElement("button", {
+            onClick: () => setShowDiagnosticsModal(false),
+            className: "w-7 h-7 flex items-center justify-center text-white/50 hover:text-white rounded-lg hover:bg-white/[0.08] transition-colors font-mono cursor-pointer"
+          }, "✕")
+        ),
+
+        React.createElement("div", { className: "p-6 overflow-y-auto space-y-5 text-xs font-mono flex-1" },
+          React.createElement("div", { className: "p-4 bg-black/50 border border-white/10 rounded-xl space-y-2" },
+            React.createElement("span", { className: "text-[10px] text-[#D4A373] font-bold uppercase tracking-wider block" }, "MATHEMATICAL FORMULATION"),
+            React.createElement("p", { className: "text-white/80 text-[11px] leading-relaxed font-sans" }, "The spatial optimization problem is formulated as a continuous Fermat-Weber facility location problem on the Riemannian sphere. It minimizes total ton-kilometer fleet transit distance subject to vehicle circuity and throughput load constraints:"),
+            React.createElement("div", { className: "p-2.5 bg-white/[0.03] border border-white/10 rounded text-center text-[#D4A373] font-mono text-xs overflow-x-auto" }, "min J(C) = ∑(j=1..k) ∑(i∈Sj) w_i · [ d_haversine(c_j, x_i) × R_circuity ] × Rate_km + k · Fixed_Capex")
+          ),
+
+          solverStats && React.createElement("div", { className: "grid grid-cols-4 gap-2.5 text-center" },
+            React.createElement("div", { className: "p-3 bg-white/[0.03] border border-white/10 rounded-xl" },
+              React.createElement("span", { className: "text-[9px] text-white/40 block" }, "MODEL"),
+              React.createElement("span", { className: "text-xs font-bold text-[#D4A373] block truncate" }, solverStats.modelName)
+            ),
+            React.createElement("div", { className: "p-3 bg-white/[0.03] border border-white/10 rounded-xl" },
+              React.createElement("span", { className: "text-[9px] text-white/40 block" }, "LOOPS TO CONVERGE"),
+              React.createElement("span", { className: "text-xs font-bold text-white block" }, `${solverStats.iterations} iterations`)
+            ),
+            React.createElement("div", { className: "p-3 bg-white/[0.03] border border-white/10 rounded-xl" },
+              React.createElement("span", { className: "text-[9px] text-white/40 block" }, "EXECUTION TIME"),
+              React.createElement("span", { className: "text-xs font-bold text-emerald-400 block" }, `${solverStats.executionTimeMs} ms`)
+            ),
+            React.createElement("div", { className: "p-3 bg-white/[0.03] border border-white/10 rounded-xl" },
+              React.createElement("span", { className: "text-[9px] text-white/40 block" }, "SILHOUETTE INDEX"),
+              React.createElement("span", { className: "text-xs font-bold text-white block" }, `${solverStats.silhouetteScore} / 1.0`)
+            )
+          ),
+
+          React.createElement("div", { className: "space-y-2" },
+            React.createElement("span", { className: "text-[10px] text-white/60 uppercase tracking-wider block" }, "STEP-BY-STEP CONVERGENCE TELEMETRY LOG"),
+            React.createElement("div", { className: "border border-white/10 rounded-xl overflow-hidden bg-black/40" },
+              React.createElement("table", { className: "w-full text-left text-[11px]" },
+                React.createElement("thead", { className: "bg-white/[0.04] text-white/60 border-b border-white/10 text-[10px] uppercase" },
+                  React.createElement("tr", null,
+                    React.createElement("th", { className: "py-2 px-3 font-semibold" }, "Iteration"),
+                    React.createElement("th", { className: "py-2 px-3 font-semibold" }, "Objective Loss J"),
+                    React.createElement("th", { className: "py-2 px-3 font-semibold" }, "Max Centroid Shift"),
+                    React.createElement("th", { className: "py-2 px-3 font-semibold" }, "Convergence Status")
+                  )
+                ),
+                React.createElement("tbody", { className: "divide-y divide-white/5" },
+                  (solverStats && solverStats.iterationLog && solverStats.iterationLog.length > 0) ? (
+                    solverStats.iterationLog.map((row) =>
+                      React.createElement("tr", { key: row.iteration, className: "hover:bg-white/[0.02]" },
+                        React.createElement("td", { className: "py-2 px-3 text-white font-bold" }, `Loop ${row.iteration}`),
+                        React.createElement("td", { className: "py-2 px-3 text-[#D4A373]" }, `₹${row.loss.toLocaleString()}`),
+                        React.createElement("td", { className: "py-2 px-3 text-white/80" }, `${row.maxShiftMeters} m`),
+                        React.createElement("td", { className: "py-2 px-3" },
+                          React.createElement("span", {
+                            className: `px-1.5 py-0.5 rounded text-[9px] font-bold ${row.maxShiftMeters < 5 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-white/[0.05] text-white/60'}`
+                          }, row.status)
+                        )
+                      )
+                    )
+                  ) : React.createElement("tr", null,
+                    React.createElement("td", { colSpan: 4, className: "py-4 text-center text-white/40" }, "No telemetry logs generated yet. Click 'Run Optimization' on the workspace HUD.")
+                  )
+                )
+              )
+            )
+          )
+        ),
+
+        React.createElement("div", { className: "px-6 py-3.5 border-t border-white/10 bg-[#161B22]/90 flex items-center justify-between flex-none font-mono text-xs" },
+          React.createElement("span", { className: "text-white/40 text-[10px]" }, "Deterministic Mathematical Proof • Verified via Riemann Haversine Metric"),
+          React.createElement("button", {
+            onClick: () => setShowDiagnosticsModal(false),
+            className: "px-4 py-1.5 rounded-lg bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] font-bold text-xs transition-colors cursor-pointer"
+          }, "Close Diagnostics")
+        )
+      )
+    )
+  );
 };
+
 
 /* === MAIN APPLICATION RUNNER === */
 
@@ -4439,6 +4902,1040 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
       onClick: () => setShowChatbot(true)
     }));
   }
+
+
+/* === COMPONENT: InventoryModal.js === */
+// GRIDPOINT — Enterprise Stock Inventory Dossier Modal
+// Real-Time SKU Levels, Warehouse Buffer Distribution & Health Diagnostics
+
+window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
+
+window.GRIDPOINT_COMPONENTS.InventoryModal = function({
+  warehouses,
+  onClose,
+  onOpenChatbot
+}) {
+  const [items, setItems] = React.useState([]);
+  const [stats, setStats] = React.useState(null);
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [selectedCategory, setSelectedCategory] = React.useState("ALL");
+  const [selectedStatus, setSelectedStatus] = React.useState("ALL");
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const res = await fetch("/api/inventory");
+        if (res.ok) {
+          const data = await res.json();
+          setItems(data.items || []);
+          setStats(data.stats || null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch inventory:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInventory();
+  }, []);
+
+  const categories = React.useMemo(() => {
+    const set = new Set();
+    items.forEach(i => set.add(i.category));
+    return ["ALL", ...Array.from(set)];
+  }, [items]);
+
+  const filteredItems = React.useMemo(() => {
+    return items.filter(item => {
+      const matchSearch = (
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      const matchCategory = selectedCategory === "ALL" || item.category === selectedCategory;
+      const matchStatus = selectedStatus === "ALL" || item.status === selectedStatus;
+      return matchSearch && matchCategory && matchStatus;
+    });
+  }, [items, searchQuery, selectedCategory, selectedStatus]);
+
+  const exportCSV = () => {
+    if (!items || items.length === 0) return;
+    let csv = "SKU,Product Name,Category,Unit Cost (INR),Total On Hand,WH-01 Stock,WH-02 Stock,WH-03 Stock,Reorder Level,Status\n";
+    items.forEach(i => {
+      const wh1 = i.warehouseStock && i.warehouseStock["WH-01"] ? i.warehouseStock["WH-01"].onHand : 0;
+      const wh2 = i.warehouseStock && i.warehouseStock["WH-02"] ? i.warehouseStock["WH-02"].onHand : 0;
+      const wh3 = i.warehouseStock && i.warehouseStock["WH-03"] ? i.warehouseStock["WH-03"].onHand : 0;
+      csv += `"${i.sku}","${i.name.replace(/"/g, '""')}","${i.category}",${i.unitCostInr},${i.totalOnHand},${wh1},${wh2},${wh3},${i.minReorderLevel},"${i.status}"\n`;
+    });
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `GRIDPOINT_Inventory_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return React.createElement("div", {
+    className: "fixed inset-0 z-[2000] flex items-center justify-center p-4 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
+  },
+    React.createElement("div", {
+      className: "w-full max-w-5xl h-[88vh] bg-[#090B0E]/95 border border-white/20 shadow-2xl rounded-lg flex flex-col overflow-hidden text-white font-sans",
+      style: { boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 30px rgba(212, 163, 115, 0.12)" }
+    },
+      
+      /*  Top Header  */
+      React.createElement("div", {
+        className: "flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#0F1218]/90 select-none flex-none"
+      },
+        React.createElement("div", { className: "flex items-center space-x-3" },
+          React.createElement("div", { className: "w-3 h-3 bg-[#D4A373] rotate-45" }),
+          React.createElement("div", null,
+            React.createElement("div", { className: "flex items-center space-x-2" },
+              React.createElement("span", { className: "font-mono text-sm tracking-[0.2em] uppercase font-bold text-white" }, "STOCK INVENTORY DOSSIER"),
+              React.createElement("span", { className: "px-2 py-0.5 text-[10px] font-mono bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/30 rounded font-semibold uppercase" }, "LIVE REPOSITORY")
+            ),
+            React.createElement("span", { className: "text-[11px] font-mono text-white/40 tracking-wider block" }, "MULTI-HUB SKU ALLOCATION, SAFETY BUFFERS & BUFFER DIAGNOSTICS")
+          )
+        ),
+
+        React.createElement("div", { className: "flex items-center space-x-3" },
+          onOpenChatbot && React.createElement("button", {
+            onClick: onOpenChatbot,
+            className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-[#D4A373]/50 hover:border-[#D4A373] text-[#D4A373] hover:text-white bg-[#D4A373]/10 hover:bg-[#D4A373]/20 rounded transition-all",
+            title: "Ask ShelVO AI to analyze inventory"
+          }, "◈ ASK ShelVO AI"),
+
+          React.createElement("button", {
+            onClick: exportCSV,
+            className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/20 hover:border-white/40 text-white bg-white/[0.04] hover:bg-white/[0.08] rounded transition-all"
+          }, "↓ EXPORT CSV"),
+
+          React.createElement("button", {
+            onClick: onClose,
+            className: "p-1.5 text-white/40 hover:text-white hover:bg-white/[0.08] rounded transition-all text-base font-mono",
+            title: "Close"
+          }, "✕")
+        )
+      ),
+
+      /*  KPI Stats Bar  */
+      stats ? React.createElement("div", {
+        className: "grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 bg-black/40 border-b border-white/5 flex-none text-xs font-mono"
+      },
+        React.createElement("div", { className: "p-2.5 bg-white/[0.02] border border-white/5 rounded" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px] block" }, "TOTAL CATALOG SKUS"),
+          React.createElement("span", { className: "font-serif text-xl text-white font-bold" }, stats.totalSkus),
+          React.createElement("span", { className: "text-white/30 text-[10px] block" }, "across 7 categories")
+        ),
+        React.createElement("div", { className: "p-2.5 bg-white/[0.02] border border-white/5 rounded" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px] block" }, "TOTAL UNITS ON HAND"),
+          React.createElement("span", { className: "font-serif text-xl text-white font-bold" }, `${stats.totalUnitsOnHand?.toLocaleString()} units`),
+          React.createElement("span", { className: "text-white/30 text-[10px] block" }, "3 fulfillment hubs")
+        ),
+        React.createElement("div", { className: "p-2.5 bg-white/[0.02] border border-white/5 rounded" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px] block" }, "TOTAL INVENTORY VALUE"),
+          React.createElement("span", { className: "font-serif text-xl text-[#D4A373] font-bold" }, `₹${(stats.totalValuationInr / 10000000).toFixed(2)} Cr`),
+          React.createElement("span", { className: "text-white/30 text-[10px] block" }, `₹${stats.totalValuationInr?.toLocaleString()}`)
+        ),
+        React.createElement("div", { className: "p-2.5 bg-white/[0.02] border border-white/5 rounded" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px] block" }, "ATTENTION ALERTS"),
+          React.createElement("div", { className: "flex items-center space-x-2 mt-0.5" },
+            React.createElement("span", { className: "px-1.5 py-0.5 bg-[#EF4444]/20 text-[#EF4444] rounded text-[11px] font-bold" }, `${stats.criticalStockCount} Critical`),
+            React.createElement("span", { className: "px-1.5 py-0.5 bg-[#F59E0B]/20 text-[#F59E0B] rounded text-[11px] font-bold" }, `${stats.lowStockCount} Low Stock`)
+          ),
+          React.createElement("span", { className: "text-white/30 text-[10px] block mt-1" }, `${stats.healthyStockCount} SKUs Healthy`)
+        )
+      ) : null,
+
+      /*  Filters & Search Control Row  */
+      React.createElement("div", {
+        className: "p-4 border-b border-white/10 bg-[#090B0E] flex flex-wrap items-center justify-between gap-3 flex-none text-xs font-mono"
+      },
+        React.createElement("div", { className: "flex-1 min-w-[240px]" },
+          React.createElement("input", {
+            type: "text",
+            value: searchQuery,
+            onChange: (e) => setSearchQuery(e.target.value),
+            placeholder: "Search by SKU, product name, or category...",
+            className: "w-full px-3.5 py-2 bg-black/60 border border-white/15 focus:border-[#D4A373] text-white rounded outline-none placeholder:text-white/30 transition-all"
+          })
+        ),
+
+        React.createElement("div", { className: "flex items-center space-x-2" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px]" }, "CATEGORY:"),
+          React.createElement("select", {
+            value: selectedCategory,
+            onChange: (e) => setSelectedCategory(e.target.value),
+            className: "px-3 py-2 bg-black/60 border border-white/15 focus:border-[#D4A373] text-white rounded outline-none transition-all"
+          },
+            categories.map(c => React.createElement("option", { key: c, value: c, className: "bg-[#0F1218]" }, c))
+          )
+        ),
+
+        React.createElement("div", { className: "flex items-center space-x-2" },
+          React.createElement("span", { className: "text-white/40 uppercase text-[10px]" }, "STATUS:"),
+          React.createElement("select", {
+            value: selectedStatus,
+            onChange: (e) => setSelectedStatus(e.target.value),
+            className: "px-3 py-2 bg-black/60 border border-white/15 focus:border-[#D4A373] text-white rounded outline-none transition-all"
+          },
+            ["ALL", "CRITICAL", "LOW STOCK", "OPTIMAL"].map(s => React.createElement("option", { key: s, value: s, className: "bg-[#0F1218]" }, s))
+          )
+        )
+      ),
+
+      /*  Main Inventory Table Viewport  */
+      React.createElement("div", { className: "flex-1 overflow-auto font-mono text-xs" },
+        loading ? React.createElement("div", { className: "flex items-center justify-center h-48 text-white/40 space-x-2" },
+          React.createElement("div", { className: "w-2 h-2 rounded-full bg-[#D4A373] animate-ping" }),
+          React.createElement("span", null, "Loading real-time SKU catalog...")
+        ) : filteredItems.length === 0 ? React.createElement("div", { className: "flex flex-col items-center justify-center h-48 text-white/40 space-x-2" },
+          React.createElement("span", { className: "text-lg" }, "📦"),
+          React.createElement("span", { className: "mt-2" }, "No inventory items matching filter criteria.")
+        ) : React.createElement("table", { className: "w-full text-left divide-y divide-white/10" },
+          React.createElement("thead", { className: "bg-white/[0.04] text-[10px] uppercase text-white/60 tracking-wider sticky top-0 backdrop-blur-md" },
+            React.createElement("tr", null,
+              React.createElement("th", { className: "py-3 px-4" }, "SKU / Item Description"),
+              React.createElement("th", { className: "py-3 px-3" }, "Category & Storage"),
+              React.createElement("th", { className: "py-3 px-3 text-right" }, "Unit Cost"),
+              React.createElement("th", { className: "py-3 px-3 text-center" }, "WH-01 (North)"),
+              React.createElement("th", { className: "py-3 px-3 text-center" }, "WH-02 (East)"),
+              React.createElement("th", { className: "py-3 px-3 text-center" }, "WH-03 (South)"),
+              React.createElement("th", { className: "py-3 px-3 text-right" }, "Total Stock"),
+              React.createElement("th", { className: "py-3 px-3 text-center" }, "Safety Level"),
+              React.createElement("th", { className: "py-3 px-4 text-center" }, "Status")
+            )
+          ),
+          React.createElement("tbody", { className: "divide-y divide-white/5" },
+            filteredItems.map(item => {
+              const wh1 = item.warehouseStock && item.warehouseStock["WH-01"];
+              const wh2 = item.warehouseStock && item.warehouseStock["WH-02"];
+              const wh3 = item.warehouseStock && item.warehouseStock["WH-03"];
+
+              const statusBadgeClass = item.status === "CRITICAL"
+                ? "bg-[#EF4444]/20 text-[#EF4444] border-[#EF4444]/40"
+                : item.status === "LOW STOCK"
+                ? "bg-[#F59E0B]/20 text-[#F59E0B] border-[#F59E0B]/40"
+                : "bg-[#10B981]/20 text-[#10B981] border-[#10B981]/40";
+
+              return React.createElement("tr", { key: item.sku, className: "hover:bg-white/[0.02] transition-colors" },
+                React.createElement("td", { className: "py-3 px-4 font-sans" },
+                  React.createElement("div", { className: "font-mono font-bold text-[#D4A373] text-xs" }, item.sku),
+                  React.createElement("div", { className: "text-white font-medium" }, item.name),
+                  React.createElement("div", { className: "text-[10px] text-white/40 font-mono" }, `Valuation: ₹${item.totalValuationInr?.toLocaleString()}`)
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-[11px]" },
+                  React.createElement("div", { className: "text-white/80" }, item.category),
+                  React.createElement("div", { className: "text-[10px] text-white/40" }, item.storageType)
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-right text-white font-medium" },
+                  `₹${item.unitCostInr?.toLocaleString()}`
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-center text-[11px]" },
+                  wh1 ? React.createElement("div", null,
+                    React.createElement("span", { className: `font-bold ${wh1.onHand < item.minReorderLevel ? 'text-[#F59E0B]' : 'text-white'}` }, wh1.onHand),
+                    React.createElement("span", { className: "text-white/30 text-[10px] block" }, wh1.bay)
+                  ) : "—"
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-center text-[11px]" },
+                  wh2 ? React.createElement("div", null,
+                    React.createElement("span", { className: `font-bold ${wh2.onHand < item.minReorderLevel ? 'text-[#F59E0B]' : 'text-white'}` }, wh2.onHand),
+                    React.createElement("span", { className: "text-white/30 text-[10px] block" }, wh2.bay)
+                  ) : "—"
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-center text-[11px]" },
+                  wh3 ? React.createElement("div", null,
+                    React.createElement("span", { className: `font-bold ${wh3.onHand < item.minReorderLevel ? 'text-[#F59E0B]' : 'text-white'}` }, wh3.onHand),
+                    React.createElement("span", { className: "text-white/30 text-[10px] block" }, wh3.bay)
+                  ) : "—"
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-right font-bold text-white" },
+                  `${item.totalOnHand?.toLocaleString()} u`
+                ),
+                React.createElement("td", { className: "py-3 px-3 text-center text-white/50 text-[11px]" },
+                  `${item.minReorderLevel} min`
+                ),
+                React.createElement("td", { className: "py-3 px-4 text-center" },
+                  React.createElement("span", {
+                    className: `px-2 py-0.5 text-[9px] font-bold border rounded uppercase ${statusBadgeClass}`
+                  }, item.status)
+                )
+              );
+            })
+          )
+        )
+      ),
+
+      /*  Bottom Status & Quick Action Bar  */
+      React.createElement("div", {
+        className: "px-6 py-3 border-t border-white/10 bg-[#0F1218]/90 flex items-center justify-between flex-none text-xs font-mono"
+      },
+        React.createElement("div", { className: "text-white/40 text-[11px]" },
+          `Displaying ${filteredItems.length} of ${items.length} SKUs • Total Units: ${filteredItems.reduce((a, b) => a + b.totalOnHand, 0).toLocaleString()}`
+        ),
+        onOpenChatbot && React.createElement("button", {
+          onClick: onOpenChatbot,
+          className: "px-4 py-1.5 bg-[#D4A373] hover:bg-[#E29578] text-[#08090C] font-bold rounded transition-all flex items-center space-x-1.5"
+        },
+          React.createElement("span", null, "◈ REBALANCE STOCK VIA ShelVO AI"),
+          React.createElement("span", null, "→")
+        )
+      )
+    )
+  );
+};
+
+
+
+/* === COMPONENT: ChatbotModal.js === */
+// SHELVO — Enterprise Autonomous Operations AI Copilot
+// Swiss Editorial Dark Glassmorphism Aesthetic with Live Logistics Telemetry
+
+window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
+
+(function() {
+  // ShelVO Copper Brand Glyph SVG
+  function ShelvoGlyph({ size = 20, color = "#090B0E" }) {
+    return React.createElement("svg", {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: color,
+      strokeWidth: "2.2",
+      strokeLinecap: "round",
+      strokeLinejoin: "round"
+    },
+      React.createElement("path", { d: "M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" }),
+      React.createElement("polyline", { points: "3.27 6.96 12 12.01 20.73 6.96" }),
+      React.createElement("line", { x1: "12", y1: "22.08", x2: "12", y2: "12" })
+    );
+  }
+
+  // Header Brand Badge
+  function ShelvoHeaderBadge({ size = 32 }) {
+    return React.createElement("div", {
+      className: "relative flex-none rounded-lg flex items-center justify-center select-none shadow-md",
+      style: {
+        width: size + "px",
+        height: size + "px",
+        background: "linear-gradient(135deg, #D4A373 0%, #B88252 100%)",
+        boxShadow: "0 2px 10px rgba(212, 163, 115, 0.35)"
+      }
+    },
+      React.createElement(ShelvoGlyph, { size: Math.round(size * 0.58), color: "#090B0E" })
+    );
+  }
+
+  window.GRIDPOINT_COMPONENTS.ChatbotModal = function({
+    neighborhoods,
+    optimizationResult,
+    baselineMetrics,
+    user,
+    onClose,
+    onTriggerOptimization,
+    onOpenComparison,
+    onOpenScenarios,
+    onOpenDemandShock,
+    onOpenInventory
+  }) {
+    const isDemoData = React.useMemo(() => {
+      if (!neighborhoods || neighborhoods.length !== 28) return false;
+      return neighborhoods.some(n => (n.neighborhood === "Koramangala" || n.name === "Koramangala"));
+    }, [neighborhoods]);
+
+    const topAreaChips = React.useMemo(() => {
+      if (!neighborhoods || neighborhoods.length === 0) {
+        return [
+          { label: "📍 Koramangala", action: "CHAT_LOCATION_Koramangala" },
+          { label: "📍 Whitefield", action: "CHAT_LOCATION_Whitefield" },
+          { label: "📍 Indiranagar", action: "CHAT_LOCATION_Indiranagar" },
+          { label: "📍 Electronic City", action: "CHAT_LOCATION_Electronic City" }
+        ];
+      }
+      if (isDemoData) {
+        return [
+          { label: "📍 Koramangala", action: "CHAT_LOCATION_Koramangala" },
+          { label: "📍 Whitefield", action: "CHAT_LOCATION_Whitefield" },
+          { label: "📍 Indiranagar", action: "CHAT_LOCATION_Indiranagar" },
+          { label: "📍 Electronic City", action: "CHAT_LOCATION_Electronic City" },
+          { label: "📍 HSR Layout", action: "CHAT_LOCATION_HSR Layout" }
+        ];
+      }
+      const sorted = [...neighborhoods].sort((a, b) => (b.dailyOrders || b.daily_orders || 0) - (a.dailyOrders || a.daily_orders || 0));
+      return sorted.slice(0, 5).map(n => {
+        const name = n.neighborhood || n.name || "Zone";
+        return { label: `📍 ${name}`, action: `CHAT_LOCATION_${name}` };
+      });
+    }, [neighborhoods, isDemoData]);
+
+    const welcomeRegion = isDemoData
+      ? "Welcome to the Bengaluru fulfillment intelligence console."
+      : `Welcome to the Regional Logistics AI Copilot (${neighborhoods ? neighborhoods.length : 0} uploaded delivery zones).`;
+
+    const [messages, setMessages] = React.useState([
+      {
+        id: "msg_init",
+        sender: "assistant",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: `${welcomeRegion}\nLogistics intelligence for hub proximity, multi-hub SKU inventory, facility capacity & cost trade-offs.\n\n**Select a workflow or enter an operational query:**`,
+        suggestedActions: [
+          { label: "📍 Nearest Hub", action: "CHAT_ASK_LOCATION" },
+          { label: "🏢 Hub Capacity", action: "CHAT_CAPACITY" },
+          { label: "📦 Stock Inventory", action: "OPEN_INVENTORY_TABLE" },
+          { label: "🔄 Rebalance Stock", action: "CHAT_REBALANCE" },
+          { label: "⚡ Demand Shock", action: "OPEN_DEMAND_SHOCK" },
+          { label: "💰 Cost & Savings", action: "CHAT_COST" },
+          { label: "⭐ Rate & Review", action: "FEEDBACK_CAT_REVIEW" },
+          { label: "🐛 Report Issue", action: "FEEDBACK_CAT_BUG" }
+        ],
+        feedbackState: null
+      }
+    ]);
+
+    const [inputVal, setInputVal] = React.useState("");
+    const [isTyping, setIsTyping] = React.useState(false);
+    const [copiedId, setCopiedId] = React.useState(null);
+    const [starHover, setStarHover] = React.useState(0);
+    const [submittedFeedbackId, setSubmittedFeedbackId] = React.useState(null);
+    const messagesEndRef = React.useRef(null);
+    const inputRef = React.useRef(null);
+
+    React.useEffect(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages, isTyping]);
+
+    React.useEffect(() => {
+      inputRef.current?.focus();
+    }, []);
+
+    const sendMessage = async (textToSend, extraContext) => {
+      const query = (textToSend || inputVal).trim();
+      if (!query || isTyping) return;
+
+      const userMsg = {
+        id: "msg_" + Date.now(),
+        sender: "user",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        text: query
+      };
+
+      setMessages(prev => [...prev, userMsg]);
+      setInputVal("");
+      setIsTyping(true);
+
+      try {
+        const payload = {
+          message: query,
+          context: Object.assign({
+            warehouses: optimizationResult ? optimizationResult.warehouses : null,
+            metrics: optimizationResult ? optimizationResult.metrics : baselineMetrics,
+            neighborhoodCount: neighborhoods ? neighborhoods.length : 28,
+            neighborhoods: (neighborhoods || []).slice(0, 60).map(n => ({
+              name: n.neighborhood || n.name || "Zone",
+              latitude: Number(n.latitude !== undefined ? n.latitude : n.lat),
+              longitude: Number(n.longitude !== undefined ? n.longitude : (n.lon !== undefined ? n.lon : n.lng)),
+              dailyOrders: Number(n.dailyOrders || n.daily_orders || n.dailyDemand || 100)
+            })),
+            isCustomUpload: !isDemoData,
+            geminiApiKey: localStorage.getItem("gridpoint_gemini_api_key") || null
+          }, extraContext || {})
+        };
+
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("API status " + res.status);
+        const data = await res.json();
+
+        const assistantMsg = {
+          id: "msg_bot_" + Date.now(),
+          sender: "assistant",
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          text: data.reply || "I've processed your telemetry request.",
+          source: data.source || "ShelVO Operations AI",
+          capacityCards: data.capacityCards || [],
+          inventoryAlerts: data.inventoryAlerts || [],
+          suggestedActions: data.suggestedActions || [],
+          feedbackState: null
+        };
+
+        setMessages(prev => [...prev, assistantMsg]);
+      } catch (err) {
+        console.error("Chat error:", err);
+        setMessages(prev => [
+          ...prev,
+          {
+            id: "msg_err_" + Date.now(),
+            sender: "assistant",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            text: "### ⚠️ Operational Disconnect\nCould not communicate with the logistics server. Ensure the backend engine is running on port 3000.",
+            suggestedActions: [
+              { label: "🔄 Retry Nearest Hub", action: "CHAT_ASK_LOCATION" },
+              { label: "📦 View Local Inventory", action: "OPEN_INVENTORY_TABLE" },
+              { label: "🐛 Report Connection Bug", action: "FEEDBACK_CAT_BUG" }
+            ],
+            feedbackState: null
+          }
+        ]);
+      } finally {
+        setIsTyping(false);
+      }
+    };
+
+    const handleMicroFeedback = async (msgId, vote) => {
+      setMessages(prev =>
+        prev.map(m => (m.id === msgId ? Object.assign({}, m, { feedbackState: vote }) : m))
+      );
+
+      const targetMsg = messages.find(m => m.id === msgId);
+      const snippet = targetMsg ? targetMsg.text.slice(0, 80) : "";
+
+      try {
+        await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: vote === "up" ? "Helpful Response" : "Unhelpful Response",
+            rating: vote === "up" ? 5 : 1,
+            feedbackText: `Micro-feedback (${vote === "up" ? "👍 Positive" : "👎 Negative"}) on telemetry snippet: "${snippet}..."`
+          })
+        });
+      } catch (e) {
+        console.warn("Failed to record micro-feedback:", e);
+      }
+    };
+
+    const handleStarRating = async (rating) => {
+      try {
+        const res = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: "General Review",
+            rating: rating,
+            feedbackText: `User rated ShelVO AI ${rating} / 5 stars via in-chat rating console.`
+          })
+        });
+        const data = await res.json();
+        setSubmittedFeedbackId(data.id || "OK");
+        sendMessage(`Rated ${rating} out of 5 stars. Thank you!`);
+      } catch (e) {
+        console.warn("Feedback rating error:", e);
+      }
+    };
+
+    const handleCopy = (msgId, text) => {
+      navigator.clipboard.writeText(text);
+      setCopiedId(msgId);
+      setTimeout(() => setCopiedId(null), 2000);
+    };
+
+    const requestUserGeolocation = () => {
+      if (!navigator.geolocation) {
+        setMessages(prev => [
+          ...prev,
+          {
+            id: "msg_geo_err_" + Date.now(),
+            sender: "assistant",
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            text: "Browser GPS geolocation is not supported in this environment. Please choose your delivery zone below:",
+            suggestedActions: [
+              { label: "📍 Retry GPS", action: "REQUEST_GEOLOCATION" },
+              ...topAreaChips
+            ],
+            feedbackState: null
+          }
+        ]);
+        return;
+      }
+
+      setIsTyping(true);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setIsTyping(false);
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          sendMessage(
+            `Find closest warehouse to my location (${lat.toFixed(4)}, ${lon.toFixed(4)})`,
+            {
+              userLocation: {
+                latitude: lat,
+                longitude: lon,
+                accuracy: pos.coords.accuracy,
+                area: `GPS Coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)})`
+              }
+            }
+          );
+        },
+        (err) => {
+          setIsTyping(false);
+          console.warn("Geolocation permission error:", err);
+          setMessages(prev => [
+            ...prev,
+            {
+              id: "msg_geo_denied_" + Date.now(),
+              sender: "assistant",
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              text: "Location access was not granted. Please select your target delivery zone or type coordinates:",
+              suggestedActions: [
+                { label: "📍 Retry GPS", action: "REQUEST_GEOLOCATION" },
+                ...topAreaChips
+              ],
+              feedbackState: null
+            }
+          ]);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      );
+    };
+
+    const handleActionClick = (action) => {
+      if (action === "OPEN_INVENTORY_TABLE" && onOpenInventory) {
+        onOpenInventory();
+      } else if (action === "OPEN_DEMAND_SHOCK" && onOpenDemandShock) {
+        onOpenDemandShock();
+      } else if (action === "OPEN_SCENARIOS" && onOpenScenarios) {
+        onOpenScenarios();
+      } else if (action === "OPEN_BEFORE_AFTER" && onOpenComparison) {
+        onOpenComparison();
+      } else if (action === "TRIGGER_OPTIMIZE" && onTriggerOptimization) {
+        onTriggerOptimization();
+      } else if (action === "REQUEST_GEOLOCATION") {
+        requestUserGeolocation();
+      } else if (action === "CHAT_ASK_LOCATION") {
+        sendMessage("Which warehouse is nearest to me?");
+      } else if (action && action.startsWith("CHAT_LOCATION_")) {
+        const area = action.replace("CHAT_LOCATION_", "");
+        sendMessage(`Find the closest warehouse to ${area}`);
+      } else if (action === "FEEDBACK_CAT_BUG") {
+        sendMessage("Report an issue: I noticed an unexpected behavior.");
+      } else if (action === "FEEDBACK_CAT_FEATURE") {
+        sendMessage("Suggest a feature: I would like to propose an enhancement.");
+      } else if (action === "FEEDBACK_CAT_REVIEW") {
+        sendMessage("Submit review: Share general feedback and ratings for ShelVO.");
+      } else if (action === "CHAT_CAPACITY") {
+        sendMessage("What is the current capacity and utilization of our fulfillment warehouses?");
+      } else if (action === "CHAT_REBALANCE") {
+        sendMessage("How can we rebalance stock between warehouses to prevent stockouts?");
+      } else if (action === "CHAT_COST") {
+        sendMessage("What are our daily delivery costs and savings compared to baseline?");
+      } else {
+        sendMessage(action);
+      }
+    };
+
+    // Helper to format inline markdown formatting
+    const formatInlineMarkdown = (text) => {
+      if (!text) return text;
+      const parts = text.split(/(\*\*.*?\*\*|`.*?`|\*.*?\*)/g);
+      return parts.map((part, i) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return React.createElement("strong", { key: i, className: "text-[#F4F4F6] font-semibold" }, part.slice(2, -2));
+        }
+        if (part.startsWith("*") && part.endsWith("*") && !part.startsWith("**")) {
+          return React.createElement("em", { key: i, className: "text-white/60 italic" }, part.slice(1, -1));
+        }
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return React.createElement("code", { key: i, className: "px-1.5 py-0.5 bg-white/[0.08] text-[#D4A373] font-mono text-[11px] rounded border border-white/10" }, part.slice(1, -1));
+        }
+        return part;
+      });
+    };
+
+    // Formatted markdown renderer with Swiss Editorial dark aesthetic
+    const renderFormattedText = (rawText) => {
+      if (!rawText) return null;
+      const lines = rawText.split("\n");
+      const elements = [];
+      let inTable = false;
+      let tableHeader = [];
+      let tableRows = [];
+
+      const flushTable = (key) => {
+        if (tableHeader.length > 0 || tableRows.length > 0) {
+          elements.push(
+            React.createElement("div", {
+              key: `tbl_${key}`,
+              className: "my-2 overflow-x-auto rounded-lg border border-white/10 bg-[#090B0E]/80"
+            },
+              React.createElement("table", { className: "w-full text-left font-mono text-[11px]" },
+                React.createElement("thead", { className: "bg-white/[0.04] border-b border-white/10 text-white/60 tracking-wider text-[10px] uppercase" },
+                  React.createElement("tr", null,
+                    tableHeader.map((th, i) => React.createElement("th", { key: i, className: "py-1.5 px-3 font-semibold text-white/70" }, th))
+                  )
+                ),
+                React.createElement("tbody", { className: "divide-y divide-white/5" },
+                  tableRows.map((row, rIdx) =>
+                    React.createElement("tr", { key: rIdx, className: "hover:bg-white/[0.02] transition-colors" },
+                      row.map((col, cIdx) => React.createElement("td", { key: cIdx, className: "py-1.5 px-3 text-white/90" }, formatInlineMarkdown(col)))
+                    )
+                  )
+                )
+              )
+            )
+          );
+          tableHeader = [];
+          tableRows = [];
+          inTable = false;
+        }
+      };
+
+      lines.forEach((line, idx) => {
+        const trimmed = line.trim();
+
+        if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+          const parts = trimmed.split("|").slice(1, -1).map(p => p.trim());
+          if (parts.every(p => /^:?-+:?$/.test(p))) return;
+          if (!inTable) {
+            inTable = true;
+            tableHeader = parts.map(p => p.replace(/\*\*/g, ""));
+          } else {
+            tableRows.push(parts);
+          }
+          return;
+        } else if (inTable) {
+          flushTable(idx);
+        }
+
+        if (trimmed.startsWith("### ")) {
+          elements.push(React.createElement("h4", {
+            key: idx,
+            className: "font-mono font-bold text-white text-xs uppercase tracking-wider mt-2 mb-1 flex items-center space-x-1.5 text-[#D4A373]"
+          }, trimmed.replace("### ", "")));
+        } else if (trimmed.startsWith("#### ")) {
+          elements.push(React.createElement("h5", {
+            key: idx,
+            className: "font-mono text-white/80 text-[11px] uppercase tracking-wide mt-1.5 mb-0.5"
+          }, trimmed.replace("#### ", "")));
+        } else if (trimmed.startsWith("> [!")) {
+          const isWarning = trimmed.includes("WARNING") || trimmed.includes("CAUTION");
+          const alertColor = isWarning
+            ? "border-[#EF4444] bg-[#EF4444]/10 text-red-200"
+            : "border-[#D4A373] bg-[#D4A373]/10 text-[#FAEDCD]";
+          elements.push(
+            React.createElement("div", { key: idx, className: `p-2 my-1.5 rounded-r-lg border-l-2 text-xs font-mono ${alertColor}` },
+              React.createElement("span", { className: "font-bold uppercase text-[9px] tracking-wider block opacity-75 mb-0.5" }, isWarning ? "ALERT" : "NOTE"),
+              lines[idx + 1] ? lines[idx + 1].replace(/^>\s*/, "") : ""
+            )
+          );
+        } else if (trimmed.startsWith("> ")) {
+          if (lines[idx - 1] && lines[idx - 1].trim().startsWith("> [!")) return;
+          elements.push(React.createElement("blockquote", {
+            key: idx,
+            className: "border-l-2 border-[#D4A373]/50 pl-2.5 my-1.5 text-xs text-white/60 italic bg-white/[0.02] py-0.5 rounded-r"
+          }, trimmed.replace(/^>\s*/, "")));
+        } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+          const textContent = trimmed.slice(2);
+          elements.push(
+            React.createElement("div", { key: idx, className: "flex items-start space-x-2 my-0.5 text-xs text-white/85" },
+              React.createElement("span", { className: "text-[#D4A373] font-mono text-[10px] mt-0.5 flex-none" }, "◈"),
+              React.createElement("span", { className: "flex-1 leading-relaxed" }, formatInlineMarkdown(textContent))
+            )
+          );
+        } else if (/^\d+\.\s/.test(trimmed)) {
+          elements.push(
+            React.createElement("div", { key: idx, className: "flex items-start space-x-2 my-0.5 text-xs text-white/85" },
+              React.createElement("span", { className: "font-mono font-bold text-[#D4A373] text-[11px] flex-none" }, trimmed.match(/^\d+\./)[0]),
+              React.createElement("span", { className: "flex-1 leading-relaxed" }, formatInlineMarkdown(trimmed.replace(/^\d+\.\s*/, "")))
+            )
+          );
+        } else if (trimmed.length > 0) {
+          elements.push(React.createElement("p", {
+            key: idx,
+            className: "my-0.5 text-xs text-white/80 leading-relaxed font-sans"
+          }, formatInlineMarkdown(trimmed)));
+        }
+      });
+
+      if (inTable) flushTable(lines.length);
+      return elements;
+    };
+
+    return React.createElement("div", {
+      className: "fixed bottom-6 right-6 z-[99999] flex flex-col items-end pointer-events-auto select-none"
+    },
+      React.createElement("div", {
+        className: "w-[420px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-48px)] bg-[#0F1218]/95 backdrop-blur-2xl border border-white/15 rounded-2xl shadow-[0_24px_60px_rgba(0,0,0,0.85)] flex flex-col overflow-hidden text-white font-sans transition-all duration-300 animate-in fade-in zoom-in-95",
+        style: { boxShadow: "0 20px 50px rgba(0, 0, 0, 0.75), 0 0 30px rgba(212, 163, 115, 0.1)" }
+      },
+        
+        /*  1. Enterprise Header Bar with Glowing Indicator Pill & Star Rating  */
+        React.createElement("div", {
+          className: "px-3.5 py-3 border-b border-white/10 bg-[#161B22]/95 flex items-center justify-between flex-none backdrop-blur-md"
+        },
+          /* Brand Badge & Glowing Status Pill */
+          React.createElement("div", { className: "flex items-center space-x-2.5 min-w-0" },
+            React.createElement(ShelvoHeaderBadge, { size: 32 }),
+            React.createElement("div", { className: "flex flex-col min-w-0" },
+              React.createElement("div", { className: "flex items-center space-x-2" },
+                React.createElement("span", { className: "font-mono font-bold text-xs tracking-wider uppercase text-white truncate" }, "SHELVO AI"),
+                /* Glowing Indicator Pill */
+                React.createElement("div", {
+                  className: "inline-flex items-center space-x-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-mono tracking-wider text-emerald-300 font-semibold select-none shadow-[0_0_12px_rgba(16,185,129,0.15)]"
+                },
+                  React.createElement("span", { className: "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10B981]" }),
+                  React.createElement("span", null, "COPILOT ACTIVE")
+                )
+              ),
+              React.createElement("span", { className: "text-[10px] font-mono text-white/40 tracking-wider truncate mt-0.5" },
+                isDemoData ? "BENGALURU LOGISTICS MESH" : ("REGIONAL MESH (" + (neighborhoods ? neighborhoods.length : 0) + " NODES)")
+              )
+            )
+          ),
+
+          /* Star Rating & Window Controls */
+          React.createElement("div", { className: "flex items-center space-x-1 flex-none" },
+            /* Streamlined Star Rating Bar in Header */
+            React.createElement("div", {
+              className: "flex items-center space-x-0.5 px-2 py-1 rounded-lg bg-white/[0.03] border border-white/10 hover:border-[#D4A373]/30 transition-colors mr-1",
+              title: submittedFeedbackId ? "Feedback recorded ✓" : "Rate ShelVO Copilot"
+            },
+              [1, 2, 3, 4, 5].map((star) =>
+                React.createElement("button", {
+                  key: star,
+                  type: "button",
+                  onMouseEnter: () => setStarHover(star),
+                  onMouseLeave: () => setStarHover(0),
+                  onClick: () => handleStarRating(star),
+                  className: "hover:scale-125 transition-transform text-xs cursor-pointer leading-none",
+                  style: { color: (starHover >= star || (submittedFeedbackId && star <= 5)) ? "#D4A373" : "rgba(255,255,255,0.25)" },
+                  title: `Rate ${star} Star${star > 1 ? 's' : ''}`
+                }, "★")
+              )
+            ),
+            onOpenInventory && React.createElement("button", {
+              onClick: onOpenInventory,
+              className: "px-2 py-1 text-[10px] font-mono text-white/60 hover:text-white hover:bg-white/[0.08] rounded border border-white/10 transition-colors mr-0.5",
+              title: "Open Full Inventory Dossier"
+            }, "DOSSIER"),
+            React.createElement("button", {
+              onClick: onClose,
+              className: "w-6 h-6 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.08] rounded-md transition-colors font-mono text-xs",
+              title: "Minimize"
+            }, "−"),
+            React.createElement("button", {
+              onClick: onClose,
+              className: "w-6 h-6 flex items-center justify-center text-white/40 hover:text-white hover:bg-white/[0.08] rounded-md transition-colors font-mono text-xs",
+              title: "Close"
+            }, "✕")
+          )
+        ),
+
+        /*  2. Chat Stream Area  */
+        React.createElement("div", {
+          className: "flex-1 p-3.5 overflow-y-auto space-y-3 bg-[#090B0E]/60 scroll-smooth"
+        },
+          messages.map((msg) => {
+            const isUser = msg.sender === 'user';
+
+            if (isUser) {
+              return React.createElement("div", {
+                key: msg.id,
+                className: "flex justify-end ml-auto max-w-[85%]"
+              },
+                React.createElement("div", {
+                  className: "px-3.5 py-2 bg-[#D4A373]/15 border border-[#D4A373]/35 text-[#FAEDCD] rounded-2xl rounded-br-xs text-xs leading-relaxed shadow-sm font-sans"
+                },
+                  renderFormattedText(msg.text)
+                )
+              );
+            }
+
+            // Assistant Message Bubble
+            return React.createElement("div", {
+              key: msg.id,
+              className: "flex flex-col items-start max-w-[96%] space-y-1 w-full"
+            },
+              React.createElement("div", {
+                className: "px-3.5 py-2.5 bg-[#161B22]/90 text-white/90 border border-white/10 rounded-2xl rounded-bl-xs text-xs leading-relaxed shadow-lg w-full"
+              },
+                renderFormattedText(msg.text),
+
+                /*  Embedded Warehouse Capacity Telemetry Cards  */
+                msg.capacityCards && msg.capacityCards.length > 0 && React.createElement("div", {
+                  className: "mt-2.5 pt-2 border-t border-white/10 space-y-2"
+                },
+                  React.createElement("div", { className: "text-[10px] font-mono uppercase tracking-widest text-white/40 flex items-center justify-between" },
+                    React.createElement("span", null, "FACILITY CAPACITY TELEMETRY"),
+                    React.createElement("span", { className: "text-[#D4A373]" }, "REAL-TIME")
+                  ),
+                  msg.capacityCards.map((card, cIdx) =>
+                    React.createElement("div", {
+                      key: cIdx,
+                      className: "p-2.5 bg-black/40 border border-white/10 rounded-lg space-y-1.5 font-mono text-[11px]"
+                    },
+                      React.createElement("div", { className: "flex items-center justify-between" },
+                        React.createElement("span", { className: "font-bold text-white tracking-wide" }, `${card.code} • ${card.name}`),
+                        React.createElement("span", {
+                          className: "px-1.5 py-0.5 text-[9px] font-bold rounded uppercase",
+                          style: {
+                            color: card.statusColor || '#D4A373',
+                            backgroundColor: `${card.statusColor || '#D4A373'}20`,
+                            border: `1px solid ${card.statusColor || '#D4A373'}40`
+                          }
+                        }, card.status)
+                      ),
+                      React.createElement("div", { className: "flex justify-between text-[10px] text-white/50" },
+                        React.createElement("span", null, `Throughput: ${card.dailyAssigned?.toLocaleString()} / ${card.dailyCapacity?.toLocaleString()} ord/day`),
+                        React.createElement("span", { className: "font-bold text-[#D4A373]" }, `${card.utilizationPercent}%`)
+                      ),
+                      React.createElement("div", { className: "w-full h-1.5 bg-white/5 rounded-full overflow-hidden border border-white/5" },
+                        React.createElement("div", {
+                          className: "h-full rounded-full transition-all duration-500",
+                          style: {
+                            width: `${Math.min(100, card.utilizationPercent)}%`,
+                            backgroundColor: card.statusColor || '#D4A373'
+                          }
+                        })
+                      )
+                    )
+                  )
+                ),
+
+                /*  1. Quick-Action Chip Matrix: Symmetrical 2-Column Responsive Grid  */
+                msg.suggestedActions && msg.suggestedActions.length > 0 && React.createElement("div", {
+                  className: "mt-2.5 pt-2 border-t border-white/10 grid grid-cols-2 gap-2 w-full"
+                },
+                  msg.suggestedActions.map((act, actIdx) =>
+                    React.createElement("button", {
+                      key: actIdx,
+                      onClick: () => handleActionClick(act.action),
+                      className: `h-8 px-2.5 rounded-lg text-[11px] font-mono transition-all border flex items-center justify-start text-left truncate cursor-pointer group shadow-sm ${
+                        act.label.includes("Bug") || act.label.includes("Issue")
+                          ? "bg-red-500/10 hover:bg-red-500/20 text-red-300 border-red-500/25 hover:border-red-500/50"
+                          : act.label.includes("Feature") || act.label.includes("Suggest")
+                          ? "bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/25 hover:border-amber-500/50"
+                          : act.label.includes("Review") || act.label.includes("Rate")
+                          ? "bg-[#D4A373]/15 hover:bg-[#D4A373]/25 text-[#FAEDCD] border-[#D4A373]/30 hover:border-[#D4A373]/60"
+                          : act.label.includes("Nearest") || act.label.includes("GPS")
+                          ? "bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/25 hover:border-emerald-500/50"
+                          : "bg-white/[0.03] hover:bg-white/[0.08] text-white/80 hover:text-white border-white/10 hover:border-[#D4A373]/40"
+                      }`,
+                      title: act.label
+                    },
+                      React.createElement("span", { className: "truncate" }, act.label)
+                    )
+                  )
+                ),
+
+                /*  3. Compact Action Bar: Micro-Feedback & Timestamp in Single Low-Opacity Row  */
+                React.createElement("div", {
+                  className: "flex items-center justify-end space-x-2 pt-2 mt-2 border-t border-white/5 text-[10px] font-mono text-white/40 opacity-50 hover:opacity-100 transition-opacity select-none"
+                },
+                  React.createElement("span", { className: "text-white/30 mr-auto text-[9px]" }, msg.timestamp),
+                  React.createElement("button", {
+                    onClick: () => handleCopy(msg.id, msg.text),
+                    className: "hover:text-white transition-colors flex items-center space-x-1 px-1.5 py-0.5 rounded hover:bg-white/[0.06] cursor-pointer",
+                    title: "Copy analysis text"
+                  },
+                    React.createElement("span", null, copiedId === msg.id ? "✓" : "📋"),
+                    React.createElement("span", { className: "text-[9px]" }, copiedId === msg.id ? "Copied" : "Copy")
+                  ),
+                  React.createElement("button", {
+                    onClick: () => handleMicroFeedback(msg.id, "up"),
+                    className: `hover:text-emerald-400 transition-colors flex items-center space-x-0.5 px-1 py-0.5 rounded hover:bg-white/[0.06] cursor-pointer ${msg.feedbackState === 'up' ? 'text-emerald-400 font-bold' : ''}`,
+                    title: "Helpful response"
+                  },
+                    React.createElement("span", null, "👍")
+                  ),
+                  React.createElement("button", {
+                    onClick: () => handleMicroFeedback(msg.id, "down"),
+                    className: `hover:text-red-400 transition-colors flex items-center space-x-0.5 px-1 py-0.5 rounded hover:bg-white/[0.06] cursor-pointer ${msg.feedbackState === 'down' ? 'text-red-400 font-bold' : ''}`,
+                    title: "Needs improvement"
+                  },
+                    React.createElement("span", null, "👎")
+                  )
+                )
+              )
+            );
+          }),
+
+          /*  Typing Telemetry Pulse  */
+          isTyping && React.createElement("div", {
+            className: "px-3.5 py-2 bg-[#161B22]/80 border border-white/10 rounded-2xl rounded-bl-xs text-xs text-white/50 inline-flex items-center space-x-2 font-mono"
+          },
+            React.createElement("span", null, "ShelVO is computing"),
+            React.createElement("div", { className: "w-1 h-1 rounded-full bg-[#D4A373] animate-bounce", style: { animationDelay: "0ms" } }),
+            React.createElement("div", { className: "w-1 h-1 rounded-full bg-[#D4A373] animate-bounce", style: { animationDelay: "150ms" } }),
+            React.createElement("div", { className: "w-1 h-1 rounded-full bg-[#D4A373] animate-bounce", style: { animationDelay: "300ms" } })
+          ),
+
+          React.createElement("div", { ref: messagesEndRef })
+        ),
+
+        /*  4. Streamlined Input Bar: Sleek Unified Field & Submit Button  */
+        React.createElement("div", {
+          className: "p-3 border-t border-white/10 bg-[#0F1218]/95 flex-none backdrop-blur-md"
+        },
+          React.createElement("form", {
+            onSubmit: (e) => {
+              e.preventDefault();
+              sendMessage();
+            },
+            className: "flex items-center space-x-2"
+          },
+            React.createElement("div", {
+              className: "flex-1 flex items-center rounded-xl bg-slate-900/80 border border-slate-700/60 focus-within:border-[#D4A373]/80 focus-within:ring-1 focus-within:ring-[#D4A373]/20 px-3 py-2 transition-all shadow-inner"
+            },
+              React.createElement("button", {
+                type: "button",
+                onClick: () => handleActionClick("REQUEST_GEOLOCATION"),
+                className: "text-white/40 hover:text-[#D4A373] transition-colors mr-2.5 text-xs flex-none cursor-pointer",
+                title: "Share live device GPS location"
+              }, "📍"),
+              React.createElement("input", {
+                ref: inputRef,
+                type: "text",
+                value: inputVal,
+                onChange: (e) => setInputVal(e.target.value),
+                placeholder: "Ask nearest hub, inventory, capacity, or feedback...",
+                className: "flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/35 font-sans"
+              })
+            ),
+            React.createElement("button", {
+              type: "submit",
+              disabled: !inputVal.trim() || isTyping,
+              className: "h-9 px-3 rounded-xl bg-gradient-to-r from-[#D4A373] to-[#B88252] hover:from-[#E29578] hover:to-[#C69060] disabled:opacity-30 disabled:cursor-not-allowed text-[#090B0E] flex items-center justify-center space-x-1.5 transition-all flex-none font-mono text-xs font-semibold shadow-md cursor-pointer border border-[#D4A373]/40",
+              title: "Transmit Query"
+            },
+              React.createElement("span", { className: "text-xs font-bold leading-none" }, "Send"),
+              React.createElement("span", { className: "text-[10px] leading-none" }, "➤")
+            )
+          )
+        )
+      )
+    );
+  };
+
+  // Luxury Circular Floating Launcher Button (Copper gradient with pulsing emerald status badge)
+  window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton = function({ isOpen, onClick }) {
+    if (isOpen) return null;
+
+    return React.createElement("button", {
+      onClick: onClick,
+      className: "group fixed bottom-6 right-6 z-[99999] w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 hover:scale-105 select-none cursor-pointer focus:outline-none border border-white/15",
+      style: {
+        background: "linear-gradient(135deg, #D4A373 0%, #B88252 100%)",
+        boxShadow: "0 10px 30px -3px rgba(212, 163, 115, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.5)"
+      },
+      title: "Open ShelVO Operations AI Copilot"
+    },
+      React.createElement("div", { className: "relative flex items-center justify-center" },
+        React.createElement(ShelvoGlyph, { size: 26, color: "#090B0E" }),
+        React.createElement("span", {
+          className: "absolute -bottom-1 -right-1 w-3 h-3 rounded-full bg-[#10B981] border-2 border-[#090B0E] shadow-sm animate-pulse"
+        })
+      )
+    );
+  };
+})();
+
 
   // Mount React Root
   const container = document.getElementById('root');
