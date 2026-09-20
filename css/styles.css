@@ -1,0 +1,236 @@
+/* SHELVO — Swiss Editorial Logistics Intelligence Aesthetics */
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Geist+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #090B0E;
+  --bg-secondary: #0F1218;
+  --bg-tertiary: #161B22;
+  --bg-surface: #1B212B;
+  --text-primary: #F4F4F6;
+  --text-muted: #8E96A4;
+  --text-dim: #505969;
+  --accent-copper: #D4A373;
+  --accent-copper-hover: #E29578;
+  --accent-emerald: #10B981;
+  --accent-cyan: #38BDF8;
+  --accent-danger: #EF4444;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.14);
+  --border-active: rgba(212, 163, 115, 0.4);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: -0.011em;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-serif {
+  font-family: 'DM Serif Display', Georgia, serif;
+}
+
+.font-mono {
+  font-family: 'Geist Mono', monospace;
+}
+
+/* Glassmorphism Panels */
+.glass-panel {
+  background: rgba(15, 18, 24, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.glass-panel-solid {
+  background: #11141B;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+}
+
+.glass-hud {
+  background: rgba(11, 14, 19, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #090B0E;
+}
+::-webkit-scrollbar-thumb {
+  background: #232A36;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3A4456;
+}
+
+/* Leaflet Customizations for Dark Mode */
+.leaflet-container {
+  background: #090B0E !important;
+  font-family: 'Inter', sans-serif !important;
+}
+
+.leaflet-tile-pane {
+  background: #08090C !important;
+}
+
+/* OpenStreetMap Tiles: Deep dark styling integrated with #08090C */
+.dark-osm-tiles {
+  filter: invert(100%) hue-rotate(180deg) brightness(65%) contrast(120%) saturate(18%) !important;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6) !important;
+  background: transparent !important;
+}
+.leaflet-control-zoom a {
+  background: #11141B !important;
+  color: #D1D5DB !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #1B212B !important;
+  color: #FFF !important;
+}
+.leaflet-control-attribution {
+  background: rgba(9, 11, 14, 0.8) !important;
+  color: #505969 !important;
+  font-size: 10px !important;
+}
+.leaflet-control-attribution a {
+  color: #717A8C !important;
+}
+
+/* Radar Pulse for Warehouses */
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.radar-beacon {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: radarPulse 3s cubic-bezier(0.2, 0.8, 0.2, 1) infinite;
+}
+
+.radar-beacon-delay {
+  animation-delay: 1.5s;
+}
+
+/* Subtle Animated Dashed Connector Line */
+@keyframes dashFlow {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+
+.connector-flowing {
+  stroke-dasharray: 6, 6;
+  animation: dashFlow 2.5s linear infinite;
+}
+
+/* Range input luxury styling */
+input[type=range] {
+  -webkit-appearance: none;
+  background: #1B212B;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: #D4A373;
+  cursor: pointer;
+  border: 2px solid #090B0E;
+  box-shadow: 0 0 10px rgba(212, 163, 115, 0.5);
+  transition: all 0.15s ease;
+}
+input[type=range]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  background: #E29578;
+}
+
+/* Elegant Hover Card */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
+}
+
+/* Swiss Editorial Table Styling */
+.swiss-table th {
+  font-family: 'Geist Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8E96A4;
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+}
+.swiss-table td {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.swiss-table tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Number Counter Animation Placeholder */
+.tabular-numbers {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Subtle glow */
+.copper-glow {
+  box-shadow: 0 0 35px rgba(212, 163, 115, 0.18);
+}
+
+/* Workspace Header & Modal Layer Z-Index Stacking Rules */
+.workspace-header {
+  position: relative !important;
+  z-index: 1100 !important;
+}
+
+.modals-layer {
+  position: relative !important;
+  z-index: 2000 !important;
+}
+
+.modals-layer > * {
+  z-index: 2000 !important;
+}
+
+.custom-leaflet-tooltip {
+  z-index: 1050 !important;
+}
+
