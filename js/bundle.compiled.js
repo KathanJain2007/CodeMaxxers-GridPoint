@@ -12,7 +12,9 @@ window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS.LandingPage = function ({
   onStartOptimization,
-  onLoadDemo
+  onLoadDemo,
+  onOpenChatbot,
+  onOpenInventory
 }) {
   const canvasRef = React.useRef(null);
 
@@ -168,9 +170,19 @@ window.GRIDPOINT_COMPONENTS.LandingPage = function ({
     className: "flex items-center space-x-2"
   }, /*#__PURE__*/React.createElement("span", {
     className: "inline-block w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"
-  }), /*#__PURE__*/React.createElement("span", null, "SYSTEM OPERATIONAL")), /*#__PURE__*/React.createElement("span", null, "LAT: 12.9716\xB0 N"), /*#__PURE__*/React.createElement("span", null, "LON: 77.5946\xB0 E")), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("button", {
+  }), /*#__PURE__*/React.createElement("span", null, "SYSTEM OPERATIONAL")), /*#__PURE__*/React.createElement("span", null, "LAT: 12.9716\xB0 N"), /*#__PURE__*/React.createElement("span", null, "LON: 77.5946\xB0 E")), /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center space-x-2.5"
+  }, onOpenInventory && /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenInventory,
+    className: "px-3.5 py-1.5 border border-white/15 hover:border-[#D4A373] text-xs font-mono tracking-wider text-white/80 hover:text-white transition-all bg-white/[0.02] hover:bg-white/[0.06]"
+  }, "INVENTORY"), onOpenChatbot && /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenChatbot,
+    className: "px-3.5 py-1.5 bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] font-mono text-xs font-semibold tracking-wider transition-all flex items-center space-x-1.5 shadow-md shadow-[#D4A373]/20"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"
+  }), /*#__PURE__*/React.createElement("span", null, "ShelVO AI")), /*#__PURE__*/React.createElement("button", {
     onClick: onLoadDemo,
-    className: "px-4 py-2 border border-white/15 hover:border-[#D4A373] text-xs font-mono tracking-wider text-white/80 hover:text-white transition-all bg-white/[0.02] hover:bg-white/[0.06]"
+    className: "px-4 py-1.5 border border-white/15 hover:border-white/40 text-xs font-mono tracking-wider text-white/80 hover:text-white transition-all bg-white/[0.02] hover:bg-white/[0.06]"
   }, "QUICK DEMO (BENGALURU)"))), /*#__PURE__*/React.createElement("canvas", {
     ref: canvasRef,
     className: "absolute inset-0 w-full h-full pointer-events-none opacity-60 z-0"
@@ -791,7 +803,9 @@ window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS.Dashboard = function ({
   user,
   onNavigate,
-  onLogout
+  onLogout,
+  onOpenChatbot,
+  onOpenInventory
 }) {
   const [dashboardData, setDashboardData] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -966,7 +980,15 @@ window.GRIDPOINT_COMPONENTS.Dashboard = function ({
   }, /*#__PURE__*/React.createElement("button", {
     onClick: () => onNavigate('/dashboard'),
     className: "text-[#D4A373] font-semibold"
-  }, "DASHBOARD"), /*#__PURE__*/React.createElement("button", {
+  }, "DASHBOARD"), onOpenInventory && /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenInventory,
+    className: "hover:text-white transition-colors tracking-wider"
+  }, "INVENTORY"), onOpenChatbot && /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenChatbot,
+    className: "text-[#D4A373] hover:text-[#E29578] transition-colors flex items-center space-x-1.5 font-semibold tracking-wider"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"
+  }), /*#__PURE__*/React.createElement("span", null, "ShelVO AI")), /*#__PURE__*/React.createElement("button", {
     onClick: () => onNavigate('/analytics'),
     className: "hover:text-white transition-colors"
   }, "ANALYTICS"), /*#__PURE__*/React.createElement("button", {
@@ -1211,7 +1233,8 @@ window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS.WarehouseInspector = function ({
   warehouse,
   onClose,
-  onExplainLocation
+  onExplainLocation,
+  onOpenChatbot
 }) {
   if (!warehouse) return null;
   const formatInrLakhs = amount => {
@@ -1346,8 +1369,11 @@ window.GRIDPOINT_COMPONENTS.WarehouseInspector = function ({
     className: "text-white/80 font-semibold"
   }, n.distanceKm, " km")))))), /*#__PURE__*/React.createElement("button", {
     onClick: () => onExplainLocation(warehouse),
-    className: "w-full py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 text-xs font-mono text-white/90 hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2"
-  }, /*#__PURE__*/React.createElement("span", null, "WHY THIS LOCATION? (MATHEMATICAL PROOF)"), /*#__PURE__*/React.createElement("span", null, "\u2192"))));
+    className: "w-full py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 text-xs font-mono text-white/90 hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2"
+  }, /*#__PURE__*/React.createElement("span", null, "WHY THIS LOCATION? (MATHEMATICAL PROOF)"), /*#__PURE__*/React.createElement("span", null, "\u2192")), onOpenChatbot && /*#__PURE__*/React.createElement("button", {
+    onClick: () => onOpenChatbot(warehouse),
+    className: "w-full py-2.5 bg-[#D4A373]/15 hover:bg-[#D4A373]/25 border border-[#D4A373]/50 text-xs font-mono text-[#D4A373] hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2 mt-2"
+  }, /*#__PURE__*/React.createElement("span", null, "◈ ASK ShelVO AI ABOUT THIS HUB"), /*#__PURE__*/React.createElement("span", null, "\u2192"))));
 };
 
 /* === COMPONENT: OptimizationAnimation.js === */
@@ -3617,7 +3643,9 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
   onOpenReport,
   onReturnToHome,
   projectName,
-  onNavigateDashboard
+  onNavigateDashboard,
+  onOpenChatbot,
+  onOpenInventory
 }) {
   // Optimization form controls
   const [warehouseCount, setWarehouseCount] = React.useState(3);
@@ -3714,8 +3742,18 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
     className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/10 hover:border-[#38BDF8] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#38BDF8]/10 transition-all hidden lg:block"
   }, "ANALYTICS"), /*#__PURE__*/React.createElement("button", {
     onClick: onOpenReport,
-    className: "px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] transition-all"
-  }, "DOSSIER"))), /*#__PURE__*/React.createElement("div", {
+    className: "px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-white/[0.04] hover:bg-white/[0.08] border border-white/20 text-white transition-all"
+  }, "DOSSIER"), /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenInventory,
+    className: "px-3 py-1.5 text-xs font-mono tracking-wider border border-white/15 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all hidden sm:block",
+    title: "Inspect Multi-Hub Stock Inventory"
+  }, "INVENTORY"), /*#__PURE__*/React.createElement("button", {
+    onClick: onOpenChatbot,
+    className: "px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] transition-all flex items-center space-x-1.5 shadow-md shadow-[#D4A373]/20",
+    title: "Open ShelVO AI Operations Specialist"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"
+  }), /*#__PURE__*/React.createElement("span", null, "ShelVO AI")))), /*#__PURE__*/React.createElement("div", {
     className: "workspace relative flex-1 w-full h-[calc(100vh-4rem)] overflow-hidden"
   }, /*#__PURE__*/React.createElement("div", {
     className: "map-container relative w-full h-full"
@@ -3909,6 +3947,8 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
     const [showTransparency, setShowTransparency] = useState(false);
     const [transparencyWarehouse, setTransparencyWarehouse] = useState(null);
     const [showReport, setShowReport] = useState(false);
+    const [showChatbot, setShowChatbot] = useState(false);
+    const [showInventoryModal, setShowInventoryModal] = useState(false);
 
     // Navigation helper
     const navigate = path => {
@@ -4207,7 +4247,9 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
 
     // 1. Landing Page (/)
     if (currentPath === '/') {
-      return /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.LandingPage, {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "relative w-screen min-h-screen"
+      }, /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.LandingPage, {
         onStartOptimization: () => navigate(user ? '/dashboard' : '/login'),
         onLoadDemo: () => {
           if (user) {
@@ -4215,8 +4257,28 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
           } else {
             navigate('/login');
           }
-        }
-      });
+        },
+        onOpenChatbot: () => setShowChatbot(true),
+        onOpenInventory: () => setShowInventoryModal(true)
+      }), showChatbot && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotModal, {
+        neighborhoods: neighborhoods,
+        optimizationResult: optimizationResult,
+        baselineMetrics: baselineMetrics,
+        user: user,
+        onClose: () => setShowChatbot(false),
+        onTriggerOptimization: handleRunOptimization,
+        onOpenComparison: () => { setShowChatbot(false); setShowComparison(true); },
+        onOpenScenarios: () => { setShowChatbot(false); setShowScenarios(true); },
+        onOpenDemandShock: () => { setShowChatbot(false); setShowDemandShock(true); },
+        onOpenInventory: () => { setShowChatbot(false); setShowInventoryModal(true); }
+      }), showInventoryModal && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.InventoryModal, {
+        warehouses: optimizationResult ? optimizationResult.warehouses : null,
+        onClose: () => setShowInventoryModal(false),
+        onOpenChatbot: () => { setShowInventoryModal(false); setShowChatbot(true); }
+      }), window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton, {
+        isOpen: showChatbot,
+        onClick: () => setShowChatbot(true)
+      }));
     }
 
     // 2. Authentication Pages
@@ -4261,11 +4323,33 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
 
     // 5. Dashboard (/dashboard)
     if (currentPath === '/dashboard') {
-      return /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.Dashboard, {
+      return /*#__PURE__*/React.createElement("div", {
+        className: "relative w-screen min-h-screen"
+      }, /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.Dashboard, {
         user: user,
         onNavigate: navigate,
-        onLogout: handleLogout
-      });
+        onLogout: handleLogout,
+        onOpenChatbot: () => setShowChatbot(true),
+        onOpenInventory: () => setShowInventoryModal(true)
+      }), showChatbot && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotModal, {
+        neighborhoods: neighborhoods,
+        optimizationResult: optimizationResult,
+        baselineMetrics: baselineMetrics,
+        user: user,
+        onClose: () => setShowChatbot(false),
+        onTriggerOptimization: handleRunOptimization,
+        onOpenComparison: () => { setShowChatbot(false); setShowComparison(true); },
+        onOpenScenarios: () => { setShowChatbot(false); setShowScenarios(true); },
+        onOpenDemandShock: () => { setShowChatbot(false); setShowDemandShock(true); },
+        onOpenInventory: () => { setShowChatbot(false); setShowInventoryModal(true); }
+      }), showInventoryModal && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.InventoryModal, {
+        warehouses: optimizationResult ? optimizationResult.warehouses : null,
+        onClose: () => setShowInventoryModal(false),
+        onOpenChatbot: () => { setShowInventoryModal(false); setShowChatbot(true); }
+      }), window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton, {
+        isOpen: showChatbot,
+        onClick: () => setShowChatbot(true)
+      }));
     }
 
     // 6. Optimization Workspace (/optimize/:projectId or /optimize)
@@ -4288,7 +4372,9 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
       onOpenReport: () => setShowReport(true),
       onReturnToHome: () => navigate('/dashboard'),
       projectName: activeProject ? activeProject.name : null,
-      onNavigateDashboard: () => navigate('/dashboard')
+      onNavigateDashboard: () => navigate('/dashboard'),
+      onOpenChatbot: () => setShowChatbot(true),
+      onOpenInventory: () => setShowInventoryModal(true)
     }), /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.OptimizationAnimation, {
       isOptimizing: isOptimizing,
       optimizationResult: optimizationResult,
@@ -4333,7 +4419,25 @@ window.GRIDPOINT_COMPONENTS.Workspace = function ({
       optimizationResult: optimizationResult,
       baselineMetrics: baselineMetrics,
       onClose: () => setShowReport(false)
-    })));
+    }), showChatbot && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotModal, {
+      neighborhoods: neighborhoods,
+      optimizationResult: optimizationResult,
+      baselineMetrics: baselineMetrics,
+      user: user,
+      onClose: () => setShowChatbot(false),
+      onTriggerOptimization: handleRunOptimization,
+      onOpenComparison: () => { setShowChatbot(false); setShowComparison(true); },
+      onOpenScenarios: () => { setShowChatbot(false); setShowScenarios(true); },
+      onOpenDemandShock: () => { setShowChatbot(false); setShowDemandShock(true); },
+      onOpenInventory: () => { setShowChatbot(false); setShowInventoryModal(true); }
+    }), showInventoryModal && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.InventoryModal, {
+      warehouses: optimizationResult ? optimizationResult.warehouses : null,
+      onClose: () => setShowInventoryModal(false),
+      onOpenChatbot: () => { setShowInventoryModal(false); setShowChatbot(true); }
+    })), window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton && /*#__PURE__*/React.createElement(window.GRIDPOINT_COMPONENTS.ChatbotFloatingButton, {
+      isOpen: showChatbot,
+      onClick: () => setShowChatbot(true)
+    }));
   }
 
   // Mount React Root

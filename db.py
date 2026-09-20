@@ -149,6 +149,48 @@ def init_db():
         );
         """)
 
+        # 9. Inventory Items Catalog
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS inventory_items (
+            sku TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            unit_cost_inr REAL NOT NULL,
+            min_reorder_level INTEGER NOT NULL,
+            optimal_stock_level INTEGER NOT NULL,
+            unit_weight_kg REAL DEFAULT 1.0,
+            storage_type TEXT DEFAULT 'Standard Ambient',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
+        # 10. Warehouse Inventory Stock Levels
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS warehouse_inventory (
+            id TEXT PRIMARY KEY,
+            warehouse_code TEXT NOT NULL,
+            sku TEXT NOT NULL,
+            quantity_on_hand INTEGER NOT NULL,
+            quantity_reserved INTEGER DEFAULT 0,
+            storage_bay TEXT,
+            last_restocked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(sku) REFERENCES inventory_items(sku) ON DELETE CASCADE
+        );
+        """)
+
+        # 11. User Feedback & Reviews Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_feedback (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            category TEXT NOT NULL,
+            rating INTEGER,
+            feedback_text TEXT NOT NULL,
+            status TEXT DEFAULT 'NEW',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """)
+
         conn.commit()
 
 
@@ -178,6 +220,38 @@ def verify_password(password: str, password_hash: str, salt: str) -> bool:
 # User & Session Management
 # ==============================================================================
 
+def seed_demo_project_for_user(user_id: str):
+    """Seed the default Bengaluru Metropolitan Network demo project for a user if they have no projects."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM optimization_projects WHERE user_id = ?;", (user_id,))
+        if cursor.fetchone():
+            return
+        proj_id = "prj_" + uuid.uuid4().hex[:10]
+        now_str = datetime.datetime.utcnow().isoformat()
+        cursor.execute("""
+        INSERT INTO optimization_projects (id, user_id, name, description, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?);
+        """, (proj_id, user_id, "Bengaluru Metropolitan Network", "Decentralized facility siting model across 28 metropolitan micro-markets.", now_str, now_str))
+        conn.commit()
+
+        # Load neighborhoods from sample_demand_bengaluru.csv
+        csv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sample_demand_bengaluru.csv")
+        neighborhoods = []
+        if os.path.exists(csv_path):
+            with open(csv_path, "r", encoding="utf-8") as f:
+                for line in f.readlines()[1:]:
+                    parts = line.strip().split(",")
+                    if len(parts) >= 4:
+                        neighborhoods.append({
+                            "neighborhood": parts[0].strip(),
+                            "latitude": float(parts[1].strip()),
+                            "longitude": float(parts[2].strip()),
+                            "dailyOrders": int(parts[3].strip())
+                        })
+        if neighborhoods:
+            save_dataset_neighborhoods(proj_id, "Bengaluru Metropolitan Demo", neighborhoods)
+
 def create_user(full_name: str, email: str, password: str, organization: str) -> dict:
     """Register a new user profile with secure password hashing."""
     email_clean = email.strip().lower()
@@ -192,6 +266,10 @@ def create_user(full_name: str, email: str, password: str, organization: str) ->
             VALUES (?, ?, ?, ?, ?, ?);
             """, (user_id, full_name.strip(), email_clean, pwd_hash, salt, organization.strip()))
             conn.commit()
+
+            # Seed default demo project so dashboard is immediately ready
+            seed_demo_project_for_user(user_id)
+
             return {
                 "id": user_id,
                 "fullName": full_name.strip(),
@@ -829,6 +907,576 @@ def seed_default_data():
                             })
             if neighborhoods:
                 save_dataset_neighborhoods(proj_id, "Bengaluru Metropolitan Demo", neighborhoods)
+
+        # Seed inventory catalog and warehouse stock levels
+        seed_inventory_data()
+
+
+# ==============================================================================
+# Stock Inventory & Warehouse Capacity Intelligence
+# ==============================================================================
+
+SAMPLE_INVENTORY = [
+    {
+        "sku": "ELC-001",
+        "name": "Smart Lithium Battery Pack 48V",
+        "category": "Electronics",
+        "unit_cost_inr": 14500.0,
+        "min_reorder_level": 100,
+        "optimal_stock_level": 400,
+        "unit_weight_kg": 8.5,
+        "storage_type": "Hazardous / Dry Ambient",
+        "stocks": {
+            "WH-01": {"on_hand": 420, "reserved": 35, "bay": "BAY-A1-04"},
+            "WH-02": {"on_hand": 85, "reserved": 20, "bay": "BAY-B2-11"},  # LOW STOCK
+            "WH-03": {"on_hand": 310, "reserved": 15, "bay": "BAY-A4-02"}
+        }
+    },
+    {
+        "sku": "ELC-002",
+        "name": "Ultra-Fast 65W GaN Chargers",
+        "category": "Electronics",
+        "unit_cost_inr": 1200.0,
+        "min_reorder_level": 300,
+        "optimal_stock_level": 1200,
+        "unit_weight_kg": 0.25,
+        "storage_type": "Standard Ambient",
+        "stocks": {
+            "WH-01": {"on_hand": 1250, "reserved": 110, "bay": "BAY-A2-08"},
+            "WH-02": {"on_hand": 980, "reserved": 75, "bay": "BAY-A1-09"},
+            "WH-03": {"on_hand": 1400, "reserved": 90, "bay": "BAY-B1-03"}
+        }
+    },
+    {
+        "sku": "FMC-101",
+        "name": "Cold-Pressed Sunflower Oil 5L",
+        "category": "FMCG & Grocery",
+        "unit_cost_inr": 680.0,
+        "min_reorder_level": 250,
+        "optimal_stock_level": 900,
+        "unit_weight_kg": 4.6,
+        "storage_type": "Pallet Rack Ambient",
+        "stocks": {
+            "WH-01": {"on_hand": 850, "reserved": 45, "bay": "BAY-C1-01"},
+            "WH-02": {"on_hand": 120, "reserved": 30, "bay": "BAY-C2-05"},  # LOW STOCK
+            "WH-03": {"on_hand": 940, "reserved": 50, "bay": "BAY-C1-14"}
+        }
+    },
+    {
+        "sku": "FMC-102",
+        "name": "Organic Aged Basmati Rice 10kg",
+        "category": "FMCG & Grocery",
+        "unit_cost_inr": 950.0,
+        "min_reorder_level": 500,
+        "optimal_stock_level": 2000,
+        "unit_weight_kg": 10.0,
+        "storage_type": "Bulk Pallet Floor",
+        "stocks": {
+            "WH-01": {"on_hand": 2100, "reserved": 140, "bay": "BAY-D1-01"},
+            "WH-02": {"on_hand": 1850, "reserved": 120, "bay": "BAY-D1-04"},
+            "WH-03": {"on_hand": 2400, "reserved": 160, "bay": "BAY-D2-02"}
+        }
+    },
+    {
+        "sku": "FMC-103",
+        "name": "Artisan Dark Roast Coffee Beans 1kg",
+        "category": "FMCG & Grocery",
+        "unit_cost_inr": 850.0,
+        "min_reorder_level": 150,
+        "optimal_stock_level": 600,
+        "unit_weight_kg": 1.0,
+        "storage_type": "Aroma-Sealed Storage",
+        "stocks": {
+            "WH-01": {"on_hand": 45, "reserved": 15, "bay": "BAY-C3-02"},   # CRITICAL STOCKOUT
+            "WH-02": {"on_hand": 620, "reserved": 40, "bay": "BAY-C3-08"},
+            "WH-03": {"on_hand": 510, "reserved": 25, "bay": "BAY-C2-12"}
+        }
+    },
+    {
+        "sku": "PHR-201",
+        "name": "Temperature-Monitored Insulin Vials 100IU",
+        "category": "Healthcare & Cold-Chain",
+        "unit_cost_inr": 2400.0,
+        "min_reorder_level": 120,
+        "optimal_stock_level": 350,
+        "unit_weight_kg": 0.15,
+        "storage_type": "Cold Room (2°C - 8°C)",
+        "stocks": {
+            "WH-01": {"on_hand": 340, "reserved": 25, "bay": "COLD-ZONE-1"},
+            "WH-02": {"on_hand": 290, "reserved": 18, "bay": "COLD-ZONE-2"},
+            "WH-03": {"on_hand": 60, "reserved": 12, "bay": "COLD-ZONE-1"}   # LOW STOCK
+        }
+    },
+    {
+        "sku": "PHR-202",
+        "name": "Rapid Antigen Diagnostic Kits (25pk)",
+        "category": "Healthcare & Cold-Chain",
+        "unit_cost_inr": 1100.0,
+        "min_reorder_level": 400,
+        "optimal_stock_level": 1500,
+        "unit_weight_kg": 0.4,
+        "storage_type": "Climate-Controlled Ambient",
+        "stocks": {
+            "WH-01": {"on_hand": 1800, "reserved": 90, "bay": "BAY-E1-04"},
+            "WH-02": {"on_hand": 1450, "reserved": 65, "bay": "BAY-E1-09"},
+            "WH-03": {"on_hand": 1600, "reserved": 80, "bay": "BAY-E2-01"}
+        }
+    },
+    {
+        "sku": "APP-301",
+        "name": "Reinforced Workwear Cargo Pants",
+        "category": "Apparel & Uniforms",
+        "unit_cost_inr": 1450.0,
+        "min_reorder_level": 200,
+        "optimal_stock_level": 750,
+        "unit_weight_kg": 0.8,
+        "storage_type": "Garment Shelving",
+        "stocks": {
+            "WH-01": {"on_hand": 720, "reserved": 30, "bay": "BAY-F1-03"},
+            "WH-02": {"on_hand": 810, "reserved": 45, "bay": "BAY-F2-01"},
+            "WH-03": {"on_hand": 690, "reserved": 25, "bay": "BAY-F1-11"}
+        }
+    },
+    {
+        "sku": "APP-302",
+        "name": "High-Visibility Reflective Safety Vests",
+        "category": "Apparel & Uniforms",
+        "unit_cost_inr": 350.0,
+        "min_reorder_level": 200,
+        "optimal_stock_level": 500,
+        "unit_weight_kg": 0.2,
+        "storage_type": "Bin Shelving",
+        "stocks": {
+            "WH-01": {"on_hand": 110, "reserved": 20, "bay": "BAY-F3-01"},  # LOW STOCK
+            "WH-02": {"on_hand": 450, "reserved": 15, "bay": "BAY-F3-06"},
+            "WH-03": {"on_hand": 520, "reserved": 35, "bay": "BAY-F2-08"}
+        }
+    },
+    {
+        "sku": "IND-401",
+        "name": "Industrial Conveyor Steel Bearings",
+        "category": "Industrial Spares",
+        "unit_cost_inr": 3200.0,
+        "min_reorder_level": 100,
+        "optimal_stock_level": 500,
+        "unit_weight_kg": 2.2,
+        "storage_type": "Heavy Parts Storage",
+        "stocks": {
+            "WH-01": {"on_hand": 530, "reserved": 40, "bay": "BAY-G1-02"},
+            "WH-02": {"on_hand": 420, "reserved": 20, "bay": "BAY-G2-04"},
+            "WH-03": {"on_hand": 40, "reserved": 10, "bay": "BAY-G1-07"}   # CRITICAL STOCKOUT
+        }
+    },
+    {
+        "sku": "IND-402",
+        "name": "Heavy-Duty Hydraulic Hose Assemblies",
+        "category": "Industrial Spares",
+        "unit_cost_inr": 2800.0,
+        "min_reorder_level": 80,
+        "optimal_stock_level": 300,
+        "unit_weight_kg": 3.4,
+        "storage_type": "Heavy Parts Storage",
+        "stocks": {
+            "WH-01": {"on_hand": 290, "reserved": 15, "bay": "BAY-G3-01"},
+            "WH-02": {"on_hand": 310, "reserved": 20, "bay": "BAY-G3-05"},
+            "WH-03": {"on_hand": 275, "reserved": 12, "bay": "BAY-G2-11"}
+        }
+    },
+    {
+        "sku": "PKG-501",
+        "name": "Biodegradable Air-Cushion Packaging Rolls",
+        "category": "Packaging & Supplies",
+        "unit_cost_inr": 420.0,
+        "min_reorder_level": 800,
+        "optimal_stock_level": 3000,
+        "unit_weight_kg": 5.0,
+        "storage_type": "Bulk Packaging Racks",
+        "stocks": {
+            "WH-01": {"on_hand": 3400, "reserved": 200, "bay": "BAY-H1-01"},
+            "WH-02": {"on_hand": 2900, "reserved": 150, "bay": "BAY-H1-05"},
+            "WH-03": {"on_hand": 3100, "reserved": 180, "bay": "BAY-H2-03"}
+        }
+    },
+    {
+        "sku": "HOM-601",
+        "name": "Smart HEPA H13 Air Purifier Cartridges",
+        "category": "Home & Appliances",
+        "unit_cost_inr": 1850.0,
+        "min_reorder_level": 150,
+        "optimal_stock_level": 400,
+        "unit_weight_kg": 0.9,
+        "storage_type": "Standard Ambient",
+        "stocks": {
+            "WH-01": {"on_hand": 280, "reserved": 25, "bay": "BAY-J1-02"},
+            "WH-02": {"on_hand": 310, "reserved": 20, "bay": "BAY-J2-04"},
+            "WH-03": {"on_hand": 95, "reserved": 15, "bay": "BAY-J1-08"}   # LOW STOCK
+        }
+    }
+]
+
+WAREHOUSE_PHYSICAL_SPECS = {
+    "WH-01": {
+        "code": "WH-01",
+        "name": "North Fulfillment Hub (Peenya / Yeshwanthpur)",
+        "city": "Bengaluru",
+        "latitude": 13.0285,
+        "longitude": 77.5448,
+        "floorAreaSqFt": 45000,
+        "palletPositions": 3200,
+        "dockDoors": {"inbound": 8, "outbound": 12},
+        "dailyThroughputCapacityOrders": 5000,
+        "coldChainCapable": True,
+        "activeVehicles": 18,
+        "manager": "Arun V. Rao"
+    },
+    "WH-02": {
+        "code": "WH-02",
+        "name": "East Tech Corridor Hub (Whitefield / Mahadevapura)",
+        "city": "Bengaluru",
+        "latitude": 12.9784,
+        "longitude": 77.7289,
+        "floorAreaSqFt": 38000,
+        "palletPositions": 2700,
+        "dockDoors": {"inbound": 6, "outbound": 8},
+        "dailyThroughputCapacityOrders": 5000,
+        "coldChainCapable": False,
+        "activeVehicles": 14,
+        "manager": "Deepika S. Nair"
+    },
+    "WH-03": {
+        "code": "WH-03",
+        "name": "South Electronic City Hub (Bommanahalli / EC)",
+        "city": "Bengaluru",
+        "latitude": 12.8492,
+        "longitude": 77.6645,
+        "floorAreaSqFt": 42000,
+        "palletPositions": 3000,
+        "dockDoors": {"inbound": 8, "outbound": 10},
+        "dailyThroughputCapacityOrders": 5000,
+        "coldChainCapable": True,
+        "activeVehicles": 16,
+        "manager": "Rajesh K. Murthy"
+    },
+    "WH-04": {
+        "code": "WH-04",
+        "name": "West Expressway Hub (Kengeri / Rajajinagar)",
+        "city": "Bengaluru",
+        "latitude": 12.9172,
+        "longitude": 77.4837,
+        "floorAreaSqFt": 35000,
+        "palletPositions": 2500,
+        "dockDoors": {"inbound": 6, "outbound": 8},
+        "dailyThroughputCapacityOrders": 4500,
+        "coldChainCapable": False,
+        "activeVehicles": 12,
+        "manager": "Suresh G. Patil"
+    },
+    "WH-05": {
+        "code": "WH-05",
+        "name": "North-East Airport Transit Hub (Hebbal / Yelahanka)",
+        "city": "Bengaluru",
+        "latitude": 13.0826,
+        "longitude": 77.5973,
+        "floorAreaSqFt": 50000,
+        "palletPositions": 3600,
+        "dockDoors": {"inbound": 10, "outbound": 14},
+        "dailyThroughputCapacityOrders": 6000,
+        "coldChainCapable": True,
+        "activeVehicles": 20,
+        "manager": "Kavita R. Iyer"
+    }
+}
+
+def seed_inventory_data():
+    """Seed initial catalog and warehouse stock levels if empty."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) as cnt FROM inventory_items;")
+        if cursor.fetchone()["cnt"] > 0:
+            return  # Already seeded
+
+        for item in SAMPLE_INVENTORY:
+            cursor.execute("""
+            INSERT INTO inventory_items (
+                sku, name, category, unit_cost_inr, min_reorder_level,
+                optimal_stock_level, unit_weight_kg, storage_type
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+            """, (
+                item["sku"], item["name"], item["category"], item["unit_cost_inr"],
+                item["min_reorder_level"], item["optimal_stock_level"],
+                item["unit_weight_kg"], item["storage_type"]
+            ))
+
+            for wh_code, stock_data in item["stocks"].items():
+                stock_id = "stk_" + uuid.uuid4().hex[:12]
+                cursor.execute("""
+                INSERT INTO warehouse_inventory (
+                    id, warehouse_code, sku, quantity_on_hand, quantity_reserved, storage_bay
+                ) VALUES (?, ?, ?, ?, ?, ?);
+                """, (
+                    stock_id, wh_code, item["sku"],
+                    stock_data["on_hand"], stock_data["reserved"], stock_data["bay"]
+                ))
+
+        conn.commit()
+
+def get_all_inventory() -> list:
+    """Retrieve all catalog items with warehouse stock breakdown and health alerts."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT i.*, 
+               COALESCE(SUM(w.quantity_on_hand), 0) as total_on_hand,
+               COALESCE(SUM(w.quantity_reserved), 0) as total_reserved
+        FROM inventory_items i
+        LEFT JOIN warehouse_inventory w ON i.sku = w.sku
+        GROUP BY i.sku
+        ORDER BY i.category ASC, i.sku ASC;
+        """)
+        item_rows = cursor.fetchall()
+
+        cursor.execute("""
+        SELECT warehouse_code, sku, quantity_on_hand, quantity_reserved, storage_bay
+        FROM warehouse_inventory;
+        """)
+        stock_rows = cursor.fetchall()
+
+        # Group stocks by sku
+        stocks_by_sku = {}
+        for r in stock_rows:
+            sku = r["sku"]
+            if sku not in stocks_by_sku:
+                stocks_by_sku[sku] = {}
+            stocks_by_sku[sku][r["warehouse_code"]] = {
+                "onHand": r["quantity_on_hand"],
+                "reserved": r["quantity_reserved"],
+                "available": max(0, r["quantity_on_hand"] - r["quantity_reserved"]),
+                "bay": r["storage_bay"]
+            }
+
+        result = []
+        for r in item_rows:
+            sku = r["sku"]
+            total_on_hand = r["total_on_hand"]
+            total_reserved = r["total_reserved"]
+            available = max(0, total_on_hand - total_reserved)
+            reorder = r["min_reorder_level"]
+            optimal = r["optimal_stock_level"]
+            cost = r["unit_cost_inr"]
+            total_val = round(total_on_hand * cost, 2)
+
+            wh_stocks = stocks_by_sku.get(sku, {})
+
+            # Health classification
+            has_critical = any(st["onHand"] < reorder * 0.4 for st in wh_stocks.values())
+            has_low = any(st["onHand"] < reorder for st in wh_stocks.values())
+
+            if has_critical:
+                status = "CRITICAL"
+            elif has_low:
+                status = "LOW STOCK"
+            elif total_on_hand > optimal * 1.5:
+                status = "OVERSTOCKED"
+            else:
+                status = "OPTIMAL"
+
+            result.append({
+                "sku": sku,
+                "name": r["name"],
+                "category": r["category"],
+                "unitCostInr": cost,
+                "minReorderLevel": reorder,
+                "optimalStockLevel": optimal,
+                "unitWeightKg": r["unit_weight_kg"],
+                "storageType": r["storage_type"],
+                "totalOnHand": total_on_hand,
+                "totalReserved": total_reserved,
+                "totalAvailable": available,
+                "totalValuationInr": total_val,
+                "status": status,
+                "warehouseStock": wh_stocks
+            })
+
+        return result
+
+def get_warehouse_inventory(warehouse_code: str) -> list:
+    """Retrieve stock levels for a specific warehouse."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT i.sku, i.name, i.category, i.unit_cost_inr, i.min_reorder_level,
+               i.optimal_stock_level, i.storage_type,
+               w.quantity_on_hand, w.quantity_reserved, w.storage_bay
+        FROM warehouse_inventory w
+        JOIN inventory_items i ON w.sku = i.sku
+        WHERE w.warehouse_code = ?
+        ORDER BY i.category ASC, i.name ASC;
+        """, (warehouse_code.upper(),))
+        rows = cursor.fetchall()
+        items = []
+        for r in rows:
+            on_hand = r["quantity_on_hand"]
+            reorder = r["min_reorder_level"]
+            if on_hand < reorder * 0.4:
+                st = "CRITICAL"
+            elif on_hand < reorder:
+                st = "LOW STOCK"
+            else:
+                st = "OPTIMAL"
+
+            items.append({
+                "sku": r["sku"],
+                "name": r["name"],
+                "category": r["category"],
+                "unitCostInr": r["unit_cost_inr"],
+                "minReorderLevel": reorder,
+                "quantityOnHand": on_hand,
+                "quantityReserved": r["quantity_reserved"],
+                "available": max(0, on_hand - r["quantity_reserved"]),
+                "storageBay": r["storage_bay"],
+                "status": st,
+                "valuationInr": round(on_hand * r["unit_cost_inr"], 2)
+            })
+        return items
+
+def get_low_stock_items() -> list:
+    """Filter all items that require restocking alerts."""
+    all_items = get_all_inventory()
+    return [item for item in all_items if item["status"] in ("LOW STOCK", "CRITICAL")]
+
+def get_inventory_stats() -> dict:
+    """Compute high-level summary KPIs for inventory management."""
+    items = get_all_inventory()
+    total_skus = len(items)
+    total_units = sum(i["totalOnHand"] for i in items)
+    total_val = sum(i["totalValuationInr"] for i in items)
+    low_stock = sum(1 for i in items if i["status"] == "LOW STOCK")
+    critical_stock = sum(1 for i in items if i["status"] == "CRITICAL")
+
+    categories = {}
+    for i in items:
+        cat = i["category"]
+        if cat not in categories:
+            categories[cat] = {"count": 0, "units": 0, "valuationInr": 0.0}
+        categories[cat]["count"] += 1
+        categories[cat]["units"] += i["totalOnHand"]
+        categories[cat]["valuationInr"] += i["totalValuationInr"]
+
+    return {
+        "totalSkus": total_skus,
+        "totalUnitsOnHand": total_units,
+        "totalValuationInr": round(total_val, 2),
+        "lowStockCount": low_stock,
+        "criticalStockCount": critical_stock,
+        "healthyStockCount": total_skus - (low_stock + critical_stock),
+        "categories": categories
+    }
+
+def get_warehouse_capacity_overview(active_warehouses: list = None) -> list:
+    """
+    Compile comprehensive capacity report combining physical specifications
+    and active order throughput allocations.
+    """
+    overview = []
+    # If active optimization warehouses supplied, merge their runtime metrics
+    wh_map = {}
+    if active_warehouses:
+        for idx, wh in enumerate(active_warehouses):
+            code = wh.get("id") or f"WH-{idx + 1:02d}"
+            wh_map[code] = wh
+
+    # Build for all known physical warehouses (or at least WH-01, WH-02, WH-03)
+    for code, specs in WAREHOUSE_PHYSICAL_SPECS.items():
+        runtime_wh = wh_map.get(code)
+        
+        # Determine daily demand and order capacity
+        cap_orders = runtime_wh.get("capacityOrders") if runtime_wh else specs["dailyThroughputCapacityOrders"]
+        daily_demand = runtime_wh.get("dailyDemand") if runtime_wh else 0
+        util_pct = runtime_wh.get("capacityUtilizationPercent") if runtime_wh else int(round((daily_demand / cap_orders) * 100)) if cap_orders else 0
+        
+        # Pallet utilization estimation based on stock stored
+        wh_stock = get_warehouse_inventory(code)
+        stock_units = sum(s["quantityOnHand"] for s in wh_stock)
+        stock_val = sum(s["valuationInr"] for s in wh_stock)
+        # Approximate 1 pallet holds ~25 items on average
+        estimated_pallets_used = min(specs["palletPositions"], int(round(stock_units / 22)))
+        pallet_util_pct = int(round((estimated_pallets_used / specs["palletPositions"]) * 100)) if specs["palletPositions"] else 0
+
+        headroom_orders = max(0, cap_orders - daily_demand)
+
+        # Operational status badge
+        if util_pct > 100:
+            status = "OVERFLOW RISK"
+            status_color = "#EF4444"
+        elif util_pct > 85:
+            status = "HIGH LOAD WARNING"
+            status_color = "#F59E0B"
+        elif util_pct == 0 and not runtime_wh:
+            status = "STANDBY"
+            status_color = "#8E96A4"
+        else:
+            status = "OPTIMAL CAPACITY"
+            status_color = "#10B981"
+
+        overview.append({
+            "code": code,
+            "name": specs["name"],
+            "city": specs["city"],
+            "latitude": float(runtime_wh.get("latitude")) if runtime_wh and runtime_wh.get("latitude") is not None else specs["latitude"],
+            "longitude": float(runtime_wh.get("longitude")) if runtime_wh and runtime_wh.get("longitude") is not None else specs["longitude"],
+            "floorAreaSqFt": specs["floorAreaSqFt"],
+            "palletCapacity": specs["palletPositions"],
+            "palletsUsed": estimated_pallets_used,
+            "palletUtilizationPercent": pallet_util_pct,
+            "dockDoors": specs["dockDoors"],
+            "dailyCapacityOrders": cap_orders,
+            "dailyAssignedOrders": daily_demand,
+            "orderUtilizationPercent": util_pct,
+            "remainingHeadroomOrders": headroom_orders,
+            "activeVehicles": specs["activeVehicles"],
+            "coldChainCapable": specs["coldChainCapable"],
+            "manager": specs["manager"],
+            "stockUnits": stock_units,
+            "stockValuationInr": round(stock_val, 2),
+            "status": status,
+            "statusColor": status_color,
+            "assignedCount": runtime_wh.get("assignedCount", 0) if runtime_wh else 0,
+            "serviceRadiusKm": runtime_wh.get("serviceRadiusKm", 0) if runtime_wh else 0,
+            "averageDistanceKm": runtime_wh.get("averageDistanceKm", 0) if runtime_wh else 0
+        })
+
+    return overview
+
+
+def save_user_feedback(category: str, feedback_text: str, rating: int = None, user_id: str = None) -> dict:
+    """Save user feedback review / bug report / feature request."""
+    fb_id = f"fb_{uuid.uuid4().hex[:12]}"
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT INTO user_feedback (id, user_id, category, rating, feedback_text, status)
+        VALUES (?, ?, ?, ?, ?, 'LOGGED');
+        """, (fb_id, user_id, category, rating, feedback_text))
+        conn.commit()
+    return {
+        "id": fb_id,
+        "category": category,
+        "rating": rating,
+        "feedbackText": feedback_text,
+        "status": "LOGGED"
+    }
+
+
+def get_recent_feedback(limit: int = 15) -> list:
+    """Retrieve recently submitted feedback."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT * FROM user_feedback ORDER BY created_at DESC LIMIT ?;
+        """, (limit,))
+        rows = cursor.fetchall()
+        return [dict(r) for r in rows]
+
 
 # Auto-initialize database tables and seed baseline data on module import
 init_db()

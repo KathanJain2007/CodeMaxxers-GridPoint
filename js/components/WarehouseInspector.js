@@ -6,7 +6,8 @@ window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS.WarehouseInspector = function({
   warehouse,
   onClose,
-  onExplainLocation
+  onExplainLocation,
+  onOpenChatbot
 }) {
   if (!warehouse) return null;
 
@@ -174,11 +175,21 @@ window.GRIDPOINT_COMPONENTS.WarehouseInspector = function({
         {/* Explain Location CTA */}
         <button
           onClick={() => onExplainLocation(warehouse)}
-          className="w-full py-3 bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 text-xs font-mono text-white/90 hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2"
+          className="w-full py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/15 text-xs font-mono text-white/90 hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2"
         >
           <span>WHY THIS LOCATION? (MATHEMATICAL PROOF)</span>
           <span>→</span>
         </button>
+
+        {onOpenChatbot && (
+          <button
+            onClick={() => onOpenChatbot(warehouse)}
+            className="w-full py-2.5 bg-[#D4A373]/15 hover:bg-[#D4A373]/25 border border-[#D4A373]/50 text-xs font-mono text-[#D4A373] hover:text-white tracking-wider uppercase transition-all flex items-center justify-center space-x-2"
+          >
+            <span>◈ ASK ShelVO AI ABOUT THIS HUB</span>
+            <span>→</span>
+          </button>
+        )}
 
       </div>
     </div>

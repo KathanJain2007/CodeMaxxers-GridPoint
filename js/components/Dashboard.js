@@ -6,7 +6,8 @@ window.GRIDPOINT_COMPONENTS = window.GRIDPOINT_COMPONENTS || {};
 window.GRIDPOINT_COMPONENTS.Dashboard = function({
   user,
   onNavigate,
-  onLogout
+  onLogout,
+  onOpenChatbot
 }) {
   const [dashboardData, setDashboardData] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -206,6 +207,14 @@ window.GRIDPOINT_COMPONENTS.Dashboard = function({
             className="px-4 py-2 bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] font-medium font-mono text-xs tracking-wider uppercase transition-all shadow-md shadow-[#D4A373]/20 flex items-center space-x-1.5"
           >
             <span>+ NEW OPTIMIZATION</span>
+          </button>
+
+          <button
+            onClick={onOpenChatbot || (() => {})}
+            className="px-3 py-2 border border-[#D4A373]/60 bg-[#D4A373]/10 hover:bg-[#D4A373]/20 text-[#F4D7B5] font-mono text-[10px] tracking-[0.2em] uppercase transition-all"
+            title="Open ShelVO AI"
+          >
+            ShelVO AI
           </button>
 
           <button

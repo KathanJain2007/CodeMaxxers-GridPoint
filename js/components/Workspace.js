@@ -20,7 +20,9 @@ window.GRIDPOINT_COMPONENTS.Workspace = function({
   onOpenReport,
   onReturnToHome,
   projectName,
-  onNavigateDashboard
+  onNavigateDashboard,
+  onOpenChatbot,
+  onOpenInventory
 }) {
   // Optimization form controls
   const [warehouseCount, setWarehouseCount] = React.useState(3);
@@ -157,9 +159,26 @@ window.GRIDPOINT_COMPONENTS.Workspace = function({
 
           <button
             onClick={onOpenReport}
-            className="px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] transition-all"
+            className="px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-white/[0.04] hover:bg-white/[0.08] border border-white/20 text-white transition-all"
           >
             DOSSIER
+          </button>
+
+          <button
+            onClick={onOpenInventory}
+            className="px-3 py-1.5 text-xs font-mono tracking-wider border border-white/15 hover:border-[#D4A373] text-white/80 hover:text-white bg-white/[0.02] hover:bg-[#D4A373]/10 transition-all hidden sm:block"
+            title="Inspect Multi-Hub Stock Inventory"
+          >
+            INVENTORY
+          </button>
+
+          <button
+            onClick={onOpenChatbot}
+            className="px-3.5 py-1.5 text-xs font-mono font-semibold tracking-wider bg-[#D4A373] hover:bg-[#E29578] text-[#090B0E] transition-all flex items-center space-x-1.5 shadow-md shadow-[#D4A373]/20"
+            title="Open ShelVO AI Operations Specialist"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse"></span>
+            <span>ShelVO AI</span>
           </button>
 
         </div>
