@@ -2,6 +2,8 @@
 
 **Where should a delivery company put its warehouses?** Shelvo takes neighbourhood-level order demand, finds the best number and location of fulfilment centres, and shows the cost saving against a single central hub on an interactive map.
 
+**🔗 Live demo: [shelvo-codemaxxers.netlify.app](https://shelvo-codemaxxers.netlify.app)** — click **Quick Demo (Bengaluru)** and sign in with the demo login shown on the page.
+
 Built by **Team CodeMaxxers** for a hackathon. (The project started as *GridPoint*, which is why some file names still use that name.)
 
 On the built-in Bengaluru dataset (28 micro-markets, 11,230 orders/day), a 3-warehouse network cuts daily delivery cost by **31.9%** compared with one central depot.
