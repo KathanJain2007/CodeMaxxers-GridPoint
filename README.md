@@ -1,89 +1,109 @@
-# GRIDPOINT — Intelligent Warehouse Location Optimization
+# Shelvo — Warehouse Location Optimizer
 
-> **"Turn demand density, geodesic transport physics, and capital infrastructure economics into one intelligent, mathematically optimal decision."**
+**Where should a delivery company put its warehouses?** Shelvo takes neighbourhood-level order demand, finds the best number and location of fulfilment centres, and shows the cost saving against a single central hub on an interactive map.
 
-GRIDPOINT is an enterprise-grade logistics intelligence web platform built for high-stakes supply chain decision making. Designed with a luxury Swiss editorial aesthetic, Bloomberg-caliber analytical rigor, and an interactive dark geospatial interface, GRIDPOINT solves the multi-facility Weber problem to determine the optimal number and geodetic locations of fulfillment centers.
+Built by **Team CodeMaxxers** for a hackathon. (The project started as *GridPoint*, which is why some file names still use that name.)
 
----
-
-## Key Capabilities
-
-1. **Continuous Fermat-Weber Siting (Weiszfeld Algorithm)**
-   - Replaces planar Euclidean approximations with true **Great-Circle Haversine Geodesics** (\(R = 6,371\text{ km}\)).
-   - Solves \(\min_{W_k} \sum_{i} \text{DailyOrders}_i \times \text{Haversine}(P_i, W_k) \times \text{Rate}\) via iterative gradient descent.
-   - Initialized with **order-weighted k-means++ seeding** to prevent local minima traps.
-
-2. **Luxury Control-Room User Experience**
-   - **Immersive Map (80% Viewport)**: CartoDB Dark Matter tiles, proportional demand markers, warehouse radar beacons, and dynamic transit arcs.
-   - **Floating Frosted Glass HUD**: Minimalist Swiss control HUD floating directly over the map canvas.
-   - **5-Stage Optimization Animation**: Step-by-step progress display (`ANALYZING DEMAND` → `CLUSTERING LOCATIONS` → `PLACING WAREHOUSES` → `ASSIGNING NEIGHBORHOODS` → `CALCULATING COST`).
-   - **"WOW" Moment Result Banner**: Executive metrics displaying daily cost reduction (e.g. \(31.9\%\)), transit distance reduction, and 100% demand assignment.
-
-3. **Dedicated Before vs After Comparison Suite**
-   - **Split Screen**: Side-by-side comparison of baseline single-hub routing (Majestic Central Depot) vs decentralized multi-hub centroids.
-   - **Interactive Transition Slider**: `BEFORE ←───────[•]───────→ AFTER` smoothly interpolates spend and distance.
-
-4. **Scenario Lab (CapEx vs OpEx Trade-off)**
-   - Computes network configurations for \(k = 1, 2, 3, 4, 5\) warehouses.
-   - Interactive analytical SVG chart plotting variable transit cost vs fixed lease overhead to identify the exact **Economic Sweet Spot**.
-
-5. **Demand Shock Stress Testing & Decision Support**
-   - Simulates demand surges: Normal (\(100\%\)), Peak Day (\(+10\%\)), Festive Rush (\(+25\%\)), Flash Sale (\(+50\%\)), or custom slider (\(50\%\) to \(250\%\)).
-   - Triggers `CAPACITY EXCEEDED` alerts and provides AI rebalancing recommendations.
-
-6. **Algorithm Transparency ("Why this location?")**
-   - Executive explainability and technical proofs for technical judges.
-   - Breaks down demand pull percentages from anchor neighborhoods (Koramangala, Whitefield, Bellandur).
-
-7. **Flexible Data Ingestion**
-   - Drag-and-drop CSV importer with schema validator.
-   - Interactive manual coordinate editor.
-   - Embedded high-fidelity Bengaluru metropolitan dataset (28 micro-markets, ~11,200 orders/day).
-
-8. **Executive Dossier**
-   - One-click printable PDF summary formatted for C-level supply chain executives.
+On the built-in Bengaluru dataset (28 micro-markets, 11,230 orders/day), a 3-warehouse network cuts daily delivery cost by **31.9%** compared with one central depot.
 
 ---
 
-## Directory Structure
+## Features
+
+- **Optimal warehouse siting** — solves the multi-facility Fermat–Weber problem using real great-circle (Haversine) distances.
+- **Before vs after view** — side-by-side comparison of the single-hub baseline and the optimized network, with a slider between them.
+- **Scenario Lab** — compares 1 to 5 warehouses and plots transport cost against fixed lease cost to find the sweet spot.
+- **Demand shock testing** — simulates peak days, festive rush and flash sales (50%–250% of normal demand) and flags warehouses that run over capacity.
+- **"Why this location?"** — explains each warehouse by showing which neighbourhoods pull it where it is.
+- **Bring your own data** — drag-and-drop CSV import with validation, or edit coordinates by hand.
+- **Inventory view** — per-warehouse stock levels by SKU.
+- **AI assistant** — a logistics chatbot that answers questions about the current result (uses Google Gemini if an API key is set, otherwise built-in rule-based answers).
+- **Executive report** — one-click printable summary of the result.
+- **Accounts and projects** — sign up, save projects and keep a history of optimization runs.
+
+## How the optimizer works
+
+1. **Seeding:** weighted k-means++ picks starting warehouse locations, with each neighbourhood weighted by its daily orders. This avoids poor local minima.
+2. **Assignment:** every neighbourhood is assigned to its nearest warehouse by Haversine distance (Earth radius 6,371 km).
+3. **Relocation:** each warehouse is moved to the point that minimizes order-weighted distance to its neighbourhoods, using the Weiszfeld iterative algorithm.
+4. Steps 2 and 3 repeat until the locations stop moving.
+
+The objective is
 
 ```
-gridpoint/
-├── server.py                        # Python HTTP & REST API server
-├── index.html                       # Application shell & typography
-├── start.bat                        # Double-click launch script
-├── sample_demand_bengaluru.csv       # Sample CSV dataset for drag-and-drop testing
-├── css/
-│   └── styles.css                   # Swiss dark slate palette, radar pulse, glassmorphism
-└── js/
-    ├── data.js                      # Bengaluru dataset & CSV parser
-    ├── algorithm.js                 # Haversine, Fermat-Weber solver, scenario models
-    ├── bundle.js                    # Unified component bundle
-    └── components/                  # Component source files
-        ├── LandingPage.js
-        ├── MapComponent.js
-        ├── OptimizationAnimation.js
-        ├── BeforeAfterComparison.js
-        ├── WarehouseInspector.js
-        ├── ScenarioLab.js
-        ├── DemandShock.js
-        ├── AnalyticsView.js
-        ├── AlgorithmTransparency.js
-        ├── DataImportModal.js
-        ├── ExecutiveReportModal.js
-        └── Workspace.js
+minimize  Σ  DailyOrders(i) × Haversine(neighbourhood i, assigned warehouse) × cost per km
 ```
 
----
+Two more modes are available: a **capacitated p-median** model (each warehouse has a capacity limit) and a **Pareto multi-objective** model that also penalizes routes that miss a delivery-time target (SLA). The solver is in [`js/algorithm.js`](js/algorithm.js).
 
-## Quickstart
+## Tech stack
 
-### Method 1: Using start.bat
-Double-click `start.bat` in the `gridpoint` folder.
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Leaflet (CartoDB dark tiles), Tailwind CSS |
+| Backend | Python standard library only (`http.server`) — no pip installs needed |
+| Database | SQLite (created automatically on first run) |
+| AI | Google Gemini API (optional) |
+| Hosting | Netlify (static mode) or any machine with Python |
 
-### Method 2: Command Line
+## Run it locally
+
+You need **Python 3.9 or newer**. There is nothing to install.
+
 ```bash
-cd "c:\Users\Ansh Gupta\Documents\gridpoint"
+git clone https://github.com/KathanJain2007/CodeMaxxers-GridPoint.git
+cd CodeMaxxers-GridPoint
 python server.py
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in any modern web browser.
+
+Then open **http://localhost:3000**. On Windows you can also double-click `start.bat`.
+
+The SQLite database (`gridpoint.db`) is created automatically the first time the server starts.
+
+**Optional — AI chatbot:** set a Gemini API key before starting the server. Without it, the chatbot still works using built-in answers.
+
+```bash
+# macOS / Linux
+export GEMINI_API_KEY=your_key_here
+# Windows (PowerShell)
+$env:GEMINI_API_KEY="your_key_here"
+```
+
+## Deploying without a backend
+
+The app also runs as a plain static site (the repo includes `netlify.toml`). When it is not on `localhost` and no backend answers, [`js/mock_api.js`](js/mock_api.js) handles the API calls in the browser and stores data in `localStorage`, so login, projects and optimization all still work.
+
+## Try it with your own data
+
+Use **Import Demand** in the app and upload a CSV in this format (see [`sample_demand_bengaluru.csv`](sample_demand_bengaluru.csv)):
+
+```csv
+Neighborhood,Latitude,Longitude,Daily Orders
+Koramangala,12.9352,77.6245,580
+Indiranagar,12.9719,77.6412,520
+```
+
+## Project structure
+
+```
+├── server.py                     # HTTP server and REST API (/api/optimize, /api/projects, /api/chat, ...)
+├── db.py                         # SQLite schema and queries
+├── index.html                    # App shell
+├── start.bat                     # Windows launcher
+├── netlify.toml, _redirects      # Static hosting config
+├── sample_demand_bengaluru.csv   # Sample dataset
+├── css/styles.css
+└── js/
+    ├── algorithm.js              # Haversine, k-means++, Weiszfeld, p-median solvers
+    ├── data.js                   # Bengaluru dataset and CSV parser
+    ├── mock_api.js               # In-browser API for static hosting
+    ├── app.js
+    ├── bundle.js                 # Component bundle (source)
+    ├── bundle.compiled.js        # Component bundle (compiled, loaded by index.html)
+    └── components/               # Landing page, map, dashboard, scenario lab, demand shock,
+                                  # before/after, inspector, analytics, chatbot, reports, auth
+```
+
+## Team
+
+Team **CodeMaxxers** — [Kathan Jain](https://github.com/KathanJain2007), Aryan Khichar

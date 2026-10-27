@@ -1,0 +1,8 @@
+
+# Local database and Python cache (created at runtime)
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+.env
