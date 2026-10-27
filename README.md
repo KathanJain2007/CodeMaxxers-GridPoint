@@ -106,4 +106,4 @@ Indiranagar,12.9719,77.6412,520
 
 ## Team
 
-Team **CodeMaxxers** — [Kathan Jain](https://github.com/KathanJain2007), Aryan Khichar
+Team **CodeMaxxers** — [Kathan Jain](https://github.com/KathanJain2007), Aryan Khichar, Ansh Gupta
